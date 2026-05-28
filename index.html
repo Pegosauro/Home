@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#07111f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Casa" />
+  <title>Casa App</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="base.css" />
+  <link rel="stylesheet" href="layout.css" />
+  <link rel="stylesheet" href="components.css" />
+  <link rel="stylesheet" href="home.css" />
+  <link rel="stylesheet" href="lavori.css" />
+  <link rel="stylesheet" href="idee.css" />
+  <link rel="stylesheet" href="stanza.css" />
+  <link rel="stylesheet" href="opzioni.css" />
+  <link rel="stylesheet" href="themes.css" />
+</head>
+<body>
+  <div id="appShell" class="app-shell">
+    <header class="app-header">
+      <div>
+        <p id="eyebrow" class="eyebrow">Casa</p>
+        <h1 id="pageTitle">HOME</h1>
+      </div>
+      <div id="headerActions" class="header-actions"></div>
+    </header>
+
+    <main id="app" class="app-main" aria-live="polite"></main>
+
+    <nav id="bottomNav" class="bottom-nav" aria-label="Navigazione principale"></nav>
+  </div>
+
+  <div id="modalRoot" class="modal-root" aria-live="polite"></div>
+  <input id="jsonImportInput" class="hidden" type="file" accept="application/json,.json" />
+
+  <script src="config.js"></script>
+  <script src="storage.js"></script>
+  <script src="state.js"></script>
+  <script src="components.js"></script>
+  <script src="view-home.js"></script>
+  <script src="view-lavori.js"></script>
+  <script src="view-idee.js"></script>
+  <script src="view-stanza.js"></script>
+  <script src="view-opzioni.js"></script>
+  <script src="view-setup.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

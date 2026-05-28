@@ -1,0 +1,17 @@
+body.theme-light {
+  color-scheme: light;
+  --bg: #eef3f9;
+  --bg-soft: #ffffff;
+  --surface: rgba(255,255,255,.92);
+  --surface-2: rgba(235,242,250,.95);
+  --surface-3: rgba(220,231,244,.96);
+  --border: rgba(14,35,62,.12);
+  --border-strong: rgba(14,35,62,.2);
+  --text: #0b1727;
+  --muted: #5d6c80;
+  --muted-2: #738298;
+  --shadow: 0 18px 45px rgba(15,32,55,.14);
+}
+body.theme-light .app-shell { background: linear-gradient(180deg, #f7fbff, #eaf2fb); }
+body.theme-light .app-header { background: rgba(247,251,255,.9); }
+body.theme-light .bottom-nav { background: rgba(255,255,255,.86); }

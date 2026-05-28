@@ -1,0 +1,23 @@
+Casa App V1.3 Flat
+==================
+
+Versione senza sottocartelle, pensata per caricamento più semplice da iPhone su GitHub Pages.
+
+Come usare:
+1. Estrai lo ZIP.
+2. Carica tutti i file nella root della repository GitHub, nello stesso livello di index.html.
+3. Attiva GitHub Pages.
+
+Novità V1.3:
+- Nessun dato demo caricato automaticamente.
+- Al primo avvio compare la schermata iniziale per creare piani e stanze.
+- Dopo Reset dati l'app torna alla schermata iniziale.
+- Rimossa la funzione "Ripristina dati demo".
+- La gestione completa di piani e stanze è solo in OPZIONI.
+- Da OPZIONI puoi aggiungere, modificare ed eliminare piani e stanze.
+- Eliminando una stanza vengono eliminati anche lavori e idee collegati.
+- Eliminando un piano vengono eliminate anche le relative stanze, lavori e idee.
+- Import/export JSON invariato.
+
+Nota:
+GitHub non estrae automaticamente gli ZIP. Devi caricare i file già estratti.

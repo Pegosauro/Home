@@ -1,0 +1,15 @@
+.home-summary { margin-bottom: 14px; }
+.floor-card { padding: 12px; }
+.floor-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.room-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.room-tile { min-height: 78px; border-radius: 15px; padding: 10px; background: rgba(255,255,255,.045); border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; color: var(--text); text-align: left; }
+.room-tile-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.room-tile strong { font-size: .88rem; }
+.room-counts { display: flex; gap: 5px; flex-wrap: wrap; }
+.house-map-card { padding: 14px; }
+.house-map { display: grid; gap: 10px; }
+.map-floor { border: 1px solid var(--border); border-radius: 18px; padding: 10px; background: rgba(255,255,255,.04); }
+.map-floor-title { color: var(--muted); font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+.map-rooms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.map-room { min-height: 52px; border-radius: 11px; padding: 7px; background: linear-gradient(135deg, rgba(33,139,255,.17), rgba(255,255,255,.035)); border: 1px solid var(--border); font-size: .7rem; color: var(--text); display: flex; flex-direction: column; justify-content: space-between; }
+.map-room span:last-child { color: var(--muted); font-size: .65rem; }
