@@ -1,4 +1,6 @@
 window.addEventListener('DOMContentLoaded', () => {
+  cleanupLegacyCache();
+
   CasaApp.state.init();
   CasaApp.state.route = CasaApp.state.readHash();
   CasaApp.state.subscribe(renderApp);
@@ -21,11 +23,20 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   renderApp();
-
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.warn));
-  }
 });
+
+function cleanupLegacyCache() {
+  // Durante lo sviluppo su GitHub Pages evita che vecchi service worker/cache
+  // continuino a mostrare versioni precedenti dell'app.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations?.().then(registrations => {
+      registrations.forEach(registration => registration.unregister());
+    }).catch(console.warn);
+  }
+  if ('caches' in window) {
+    caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(console.warn);
+  }
+}
 
 function renderApp() {
   const root = document.getElementById('app');
@@ -33,7 +44,7 @@ function renderApp() {
   const view = route.view || 'home';
 
   if (CasaApp.state.needsSetup()) {
-    CasaApp.components.renderNav('home');
+    document.getElementById('bottomNav').innerHTML = '';
     CasaApp.views.setup(root);
     return;
   }

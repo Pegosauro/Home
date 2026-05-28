@@ -34,6 +34,7 @@ CasaApp.storage = {
     });
   },
   reset() {
-    localStorage.removeItem(CasaApp.CONFIG.STORAGE_KEY);
+    const keys = [CasaApp.CONFIG.STORAGE_KEY, ...(CasaApp.CONFIG.LEGACY_STORAGE_KEYS || [])];
+    keys.forEach(key => localStorage.removeItem(key));
   }
 };

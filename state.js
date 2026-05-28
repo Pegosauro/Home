@@ -19,7 +19,7 @@ CasaApp.state = {
     this.emit();
   },
   update(mutator) {
-    const draft = structuredClone ? structuredClone(this.data) : JSON.parse(JSON.stringify(this.data));
+    const draft = typeof structuredClone === 'function' ? structuredClone(this.data) : JSON.parse(JSON.stringify(this.data));
     mutator(draft);
     draft.updatedAt = CasaApp.utils.todayIso();
     this.setData(draft);

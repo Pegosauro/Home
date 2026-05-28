@@ -3,7 +3,7 @@ CasaApp.views = CasaApp.views || {};
 
 CasaApp.views.opzioni = function renderOpzioni(root) {
   const data = CasaApp.state.getData();
-  CasaApp.components.setHeader('OPZIONI', 'Impostazioni');
+  CasaApp.components.setHeader('OPZIONI', 'Impostazioni · v' + CasaApp.CONFIG.VERSION);
 
   root.innerHTML = `
     <section class="card card-inner stack" style="margin-bottom:14px">
@@ -38,7 +38,7 @@ CasaApp.views.opzioni = function renderOpzioni(root) {
 
     <section class="card card-inner stack" style="margin-top:14px">
       <h2>Nota</h2>
-      <p class="small">Dopo il reset l’app torna alla schermata iniziale di configurazione. Non vengono più caricati dati demo.</p>
+      <p class="small">Dopo il reset l’app torna alla schermata iniziale di configurazione. Non vengono più caricati dati demo.</p><p class="small"><strong>Versione app:</strong> ${CasaApp.CONFIG.VERSION}</p>
     </section>
   `;
 

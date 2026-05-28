@@ -1,8 +1,9 @@
 window.CasaApp = window.CasaApp || {};
 
 CasaApp.CONFIG = {
-  STORAGE_KEY: 'casa-app-v1-data',
-  VERSION: '1.3.0'
+  STORAGE_KEY: 'casa-app-v1-4-data',
+  LEGACY_STORAGE_KEYS: ['casa-app-v1-data', 'casa-app-v1-3-data'],
+  VERSION: '1.4.0'
 };
 
 CasaApp.utils = {

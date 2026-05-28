@@ -8,7 +8,7 @@ CasaApp.views.setup = function renderSetup(root) {
   const hasRooms = data.house.rooms.length > 0;
   const canStart = hasFloors && hasRooms;
 
-  CasaApp.components.setHeader('CONFIGURA CASA', 'Primo avvio');
+  CasaApp.components.setHeader('CONFIGURA CASA', 'Primo avvio · v' + CasaApp.CONFIG.VERSION);
 
   root.innerHTML = `
     <section class="setup-hero card card-inner stack">
