@@ -1,3 +1,117 @@
-.filter-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
-.priority-group { display: grid; gap: 8px; }
-.priority-heading { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; padding: 4px 2px; }
+/* ============================================================
+   LAVORI — lista globale lavori con filtri
+   ============================================================ */
+
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+.task-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.task-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.task-title.is-done {
+  text-decoration: line-through;
+  color: var(--text-mut);
+}
+.task-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-mut);
+  font-weight: 600;
+}
+.task-loc .ico { width: 14px; height: 14px; }
+.task-loc .sep { opacity: 0.5; }
+
+.task-badges {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.task-actions {
+  display: flex;
+  gap: 7px;
+  margin-left: auto;
+}
+
+/* Striscia priorità a sinistra */
+.task-card {
+  position: relative;
+  overflow: hidden;
+  border-left: 3px solid var(--border);
+}
+.task-card.prio-alta  { border-left-color: var(--prio-alta); }
+.task-card.prio-media { border-left-color: var(--prio-media); }
+.task-card.prio-bassa { border-left-color: var(--prio-bassa); }
+
+.filter-bar { margin-bottom: 14px; }
+
+/* ---------- DETTAGLIO LAVORO ---------- */
+.detail-card { display: flex; flex-direction: column; gap: 11px; margin-bottom: 20px; padding: 16px; }
+.detail-top { display: flex; align-items: flex-start; gap: 10px; }
+.detail-title {
+  flex: 1; min-width: 0;
+  font-size: 20px; font-weight: 800; line-height: 1.25; letter-spacing: -0.01em;
+}
+.detail-title.is-done { text-decoration: line-through; color: var(--text-mut); }
+.detail-loc {
+  align-self: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+}
+.detail-loc:active { background: var(--surface-3); }
+.detail-desc {
+  font-size: 14px; color: var(--text-soft); line-height: 1.55; white-space: pre-wrap;
+  padding-top: 4px; border-top: 1px solid var(--border);
+}
+
+/* ---------- CHECKLIST ---------- */
+.check-count { font-size: 13px; font-weight: 700; color: var(--text-mut); }
+.progress {
+  height: 8px; border-radius: 999px; background: var(--surface-3);
+  overflow: hidden; margin-bottom: 12px;
+}
+.progress-bar {
+  height: 100%; background: var(--accent); border-radius: 999px;
+  transition: width 0.25s ease;
+}
+.check-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.check-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 11px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.check-box {
+  width: 26px; height: 26px; flex: none;
+  border-radius: 8px;
+  border: 2px solid var(--border-strong);
+  background: var(--surface-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.check-box .ico { opacity: 0; transition: opacity 0.12s ease; stroke-width: 3; }
+.check-box.is-done { background: var(--accent); border-color: transparent; }
+.check-box.is-done .ico { opacity: 1; }
+.check-text { flex: 1; min-width: 0; font-size: 14.5px; line-height: 1.4; }
+.check-text.is-done { text-decoration: line-through; color: var(--text-mut); }
+.check-empty {
+  font-size: 13.5px; color: var(--text-faint); line-height: 1.5;
+  padding: 10px 2px 14px;
+}
+.check-add { display: flex; gap: 8px; }
+.check-add .input { flex: 1; }

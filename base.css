@@ -1,43 +1,146 @@
-:root {
-  color-scheme: dark;
-  --bg: #07111f;
-  --bg-soft: #0b1727;
-  --surface: rgba(18, 32, 51, .86);
-  --surface-2: rgba(28, 44, 66, .82);
-  --surface-3: rgba(42, 60, 86, .75);
-  --border: rgba(255, 255, 255, .095);
-  --border-strong: rgba(255, 255, 255, .17);
-  --text: #f5f8ff;
-  --muted: #91a1b6;
-  --muted-2: #6f8096;
-  --accent: #218bff;
-  --accent-2: #69b1ff;
-  --danger: #ff5f5f;
-  --warning: #ffc247;
-  --success: #4dd17a;
-  --shadow: 0 18px 45px rgba(0, 0, 0, .35);
-  --radius-lg: 22px;
-  --radius-md: 16px;
-  --radius-sm: 11px;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --header-height: 82px;
-  --nav-height: 74px;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+/* ============================================================
+   BASE — reset, tipografia, elementi di base
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
-body { overflow: hidden; }
-button, input, select, textarea { font: inherit; }
-button { border: 0; cursor: pointer; }
-button:disabled { opacity: .45; cursor: not-allowed; }
-.hidden { display: none !important; }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 999px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  /* background-color = fallback sicuro; background-image = strati premium
+     (se color-mix non è supportato, resta solo il colore pieno). */
+  background-color: var(--bg);
+  background-image: var(--app-bg);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
 
-h1, h2, h3, p { margin: 0; }
-h1 { font-size: 1.46rem; letter-spacing: -.04em; }
-h2 { font-size: 1.08rem; letter-spacing: -.025em; }
-h3 { font-size: .95rem; letter-spacing: -.015em; }
-.small { font-size: .8rem; color: var(--muted); }
+/* Numeri/codici tecnici monospaziati per look "tecnico" */
+.mono,
+code,
+kbd {
+  font-family: "SF Mono", ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3, h4 {
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+ul {
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Icone SVG inline coerenti */
+.ico {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ico-sm { width: 16px; height: 16px; }
+.ico-lg { width: 24px; height: 24px; }
+
+/* Niente tap highlight blu su iPhone */
+a, button, [data-action] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Focus visibile (accessibilità da tastiera) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scrollbar discreta su desktop */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+[hidden] { display: none !important; }
+
+/* Entrata a cascata degli elementi di vista (impostata da app.js) */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.8); }
+  60% { transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.anim-in { animation: fadeUp 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+/* Rispetta chi preferisce meno animazioni */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

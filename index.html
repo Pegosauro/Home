@@ -1,53 +1,46 @@
-<!doctype html>
-<html lang="it">
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#07111f" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="color-scheme" content="dark light" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Casa" />
-  <title>Casa App V1.4</title>
-  <link rel="manifest" href="manifest.json?v=1.4.0" />
-  <link rel="apple-touch-icon" href="icon-192.png?v=1.4.0" />
-  <link rel="stylesheet" href="base.css?v=1.4.0" />
-  <link rel="stylesheet" href="layout.css?v=1.4.0" />
-  <link rel="stylesheet" href="components.css?v=1.4.0" />
-  <link rel="stylesheet" href="home.css?v=1.4.0" />
-  <link rel="stylesheet" href="lavori.css?v=1.4.0" />
-  <link rel="stylesheet" href="idee.css?v=1.4.0" />
-  <link rel="stylesheet" href="stanza.css?v=1.4.0" />
-  <link rel="stylesheet" href="opzioni.css?v=1.4.0" />
-  <link rel="stylesheet" href="themes.css?v=1.4.0" />
+  <meta name="apple-mobile-web-app-title" content="Casa App" />
+  <meta name="description" content="Gestione lavori di casa, stanze, piani/aree e idee progettuali." />
+  <title>Casa App</title>
+
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="icon" type="image/png" href="./icon-192.png" />
+
+  <!-- Stylesheets: base -> tema -> layout -> componenti -> viste -->
+  <link rel="stylesheet" href="./base.css" />
+  <link rel="stylesheet" href="./themes.css" />
+  <link rel="stylesheet" href="./layout.css" />
+  <link rel="stylesheet" href="./components.css" />
+  <link rel="stylesheet" href="./home.css" />
+  <link rel="stylesheet" href="./lavori.css" />
+  <link rel="stylesheet" href="./idee.css" />
+  <link rel="stylesheet" href="./spesa.css" />
+  <link rel="stylesheet" href="./stanza.css" />
+  <link rel="stylesheet" href="./opzioni.css" />
 </head>
 <body>
-  <div id="appShell" class="app-shell">
-    <header class="app-header">
-      <div>
-        <p id="eyebrow" class="eyebrow">Casa</p>
-        <h1 id="pageTitle">HOME</h1>
-      </div>
-      <div id="headerActions" class="header-actions"></div>
-    </header>
+  <!-- Header (renderizzato da app.js) -->
+  <header id="app-header" class="app-header" hidden></header>
 
-    <main id="app" class="app-main" aria-live="polite"></main>
+  <!-- Vista principale (renderizzata da app.js) -->
+  <main id="view" class="view" role="main"></main>
 
-    <nav id="bottomNav" class="bottom-nav" aria-label="Navigazione principale"></nav>
-  </div>
+  <!-- Bottom navigation (renderizzata da app.js) -->
+  <nav id="bottom-nav" class="bottom-nav" aria-label="Navigazione principale" hidden></nav>
 
-  <div id="modalRoot" class="modal-root" aria-live="polite"></div>
-  <input id="jsonImportInput" class="hidden" type="file" accept="application/json,.json" />
+  <!-- Host per toast e modali -->
+  <div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>
+  <div id="modal-host" class="modal-host"></div>
 
-  <script src="config.js?v=1.4.0"></script>
-  <script src="storage.js?v=1.4.0"></script>
-  <script src="state.js?v=1.4.0"></script>
-  <script src="components.js?v=1.4.0"></script>
-  <script src="view-home.js?v=1.4.0"></script>
-  <script src="view-lavori.js?v=1.4.0"></script>
-  <script src="view-idee.js?v=1.4.0"></script>
-  <script src="view-stanza.js?v=1.4.0"></script>
-  <script src="view-opzioni.js?v=1.4.0"></script>
-  <script src="view-setup.js?v=1.4.0"></script>
-  <script src="app.js?v=1.4.0"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

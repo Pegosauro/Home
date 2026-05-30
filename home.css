@@ -1,15 +1,110 @@
-.home-summary { margin-bottom: 14px; }
-.floor-card { padding: 12px; }
-.floor-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.room-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.room-tile { min-height: 78px; border-radius: 15px; padding: 10px; background: rgba(255,255,255,.045); border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; color: var(--text); text-align: left; }
-.room-tile-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.room-tile strong { font-size: .88rem; }
-.room-counts { display: flex; gap: 5px; flex-wrap: wrap; }
-.house-map-card { padding: 14px; }
-.house-map { display: grid; gap: 10px; }
-.map-floor { border: 1px solid var(--border); border-radius: 18px; padding: 10px; background: rgba(255,255,255,.04); }
-.map-floor-title { color: var(--muted); font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
-.map-rooms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.map-room { min-height: 52px; border-radius: 11px; padding: 7px; background: linear-gradient(135deg, rgba(33,139,255,.17), rgba(255,255,255,.035)); border: 1px solid var(--border); font-size: .7rem; color: var(--text); display: flex; flex-direction: column; justify-content: space-between; }
-.map-room span:last-child { color: var(--muted); font-size: .65rem; }
+/* ============================================================
+   HOME — riepilogo, piani/aree, stanze, mappa casa
+   ============================================================ */
+
+/* Riepilogo statistiche */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.stat {
+  background: linear-gradient(180deg, var(--card-top), transparent 60%), var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: var(--card-inset);
+}
+.stat.accent {
+  border-color: var(--accent-line);
+  box-shadow: var(--card-inset), 0 12px 30px -18px var(--accent-glow);
+}
+.stat.accent .stat-val { text-shadow: 0 0 18px var(--accent-glow); }
+.stat .stat-val {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stat .stat-lbl {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-mut);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.stat.accent .stat-val { color: var(--accent); }
+.stat.alta .stat-val { color: var(--prio-alta); }
+.stat.fatto .stat-val { color: var(--stato-fatto); }
+
+/* Piano/area */
+.floor-group { margin-bottom: 18px; }
+.floor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px 10px;
+}
+.floor-head .floor-name {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+.floor-head .floor-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.floor-head .floor-count {
+  font-size: 12px;
+  color: var(--text-mut);
+  font-weight: 600;
+}
+
+/* Card stanza */
+.room-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+  text-align: left;
+}
+.room-ico {
+  width: 44px; height: 44px;
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 12px;
+  color: #fff;
+  box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -8px 14px -8px rgba(0, 0, 0, 0.35);
+}
+.room-ico .ico { width: 22px; height: 22px; stroke-width: 2; }
+.room-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.room-name {
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-counts {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+}
+.room-chevron { color: var(--text-faint); flex: none; }
+
+.map-floor-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 10px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}

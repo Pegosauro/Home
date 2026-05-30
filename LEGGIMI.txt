@@ -1,32 +1,124 @@
-CASA APP - V1.4 FLAT
+========================================
+ CASA APP — Istruzioni
+========================================
 
-Questa versione è senza sottocartelle.
-Carica tutti i file nella root della repository GitHub, allo stesso livello di index.html.
+Casa App è una web app statica (PWA leggera) per gestire lavori di casa,
+stanze, piani/aree e idee progettuali. Funziona sia aprendo index.html in
+locale sia pubblicata su GitHub Pages. I dati restano salvati SOLO sul tuo
+dispositivo (localStorage del browser).
 
-IMPORTANTE AGGIORNAMENTO DA VERSIONI PRECEDENTI:
-Se su GitHub Pages continui a vedere la vecchia versione, apri l'app una volta aggiungendo ?v=1.4 alla fine dell'indirizzo.
-Esempio:
-https://tuo-utente.github.io/nome-repository/?v=1.4
+----------------------------------------
+ 1. COME CARICARE I FILE SU GITHUB PAGES
+----------------------------------------
 
-Perché:
-le versioni precedenti potevano restare salvate nella cache del browser o nel service worker.
-Questa versione disattiva i vecchi service worker e svuota le cache dell'app.
+1. Crea una nuova repository su GitHub (o aprine una esistente).
+2. Carica TUTTI i file di questo progetto nella ROOT della repository,
+   cioè al primo livello, NON dentro una sottocartella.
 
-Novità V1.4:
-- avvio vuoto senza dati demo;
-- schermata iniziale CONFIGURA CASA se non esistono piani o stanze;
-- dopo Reset dati ritorna alla configurazione iniziale;
-- eliminata la funzione Ripristina dati demo;
-- gestione piani solo da OPZIONI o dal primo setup;
-- gestione stanze solo da OPZIONI o dal primo setup;
-- modifica/elimina/aggiungi piano;
-- modifica/elimina/aggiungi stanza;
-- nuova chiave dati locale per evitare che dati demo vecchi mascherino la nuova versione;
-- cache busting sui file CSS/JS per GitHub Pages.
+   File da caricare (tutti allo stesso livello):
+     - index.html
+     - app.js
+     - manifest.json
+     - base.css
+     - layout.css
+     - components.css
+     - home.css
+     - lavori.css
+     - idee.css
+     - spesa.css
+     - stanza.css
+     - opzioni.css
+     - themes.css
+     - icon-192.png
+     - icon-512.png
+     - LEGGIMI.txt
 
-Uso:
-1. Apri index.html oppure pubblica su GitHub Pages.
-2. Crea almeno un piano.
-3. Crea almeno una stanza associata al piano.
-4. Premi Entra nell'app.
-5. Da OPZIONI puoi gestire piani, stanze, JSON e tema.
+3. Vai su:  Settings  ->  Pages
+4. In "Build and deployment", alla voce "Source" scegli "Deploy from a branch".
+5. Seleziona il branch (di solito "main") e la cartella "/ (root)".
+6. Salva. Dopo qualche minuto GitHub ti darà un link tipo:
+       https://TUONOME.github.io/NOMEREPO/
+
+   Apri quel link dall'iPhone per usare l'app.
+
+IMPORTANTE:
+- Tutti i file vanno nella ROOT. NON usare sottocartelle.
+- NON caricare il file ZIP direttamente: GitHub Pages non lo apre.
+  Devi caricare i singoli file (oppure estrarre lo ZIP e caricarne il
+  contenuto).
+
+----------------------------------------
+ 2. CARICARE I FILE DALL'IPHONE
+----------------------------------------
+
+Dall'app GitHub o dal sito github.com nel browser:
+  - Apri la repository.
+  - Usa "Add file" -> "Upload files".
+  - Seleziona i file e conferma il commit.
+Se carichi uno ZIP, estrailo prima (es. con l'app File di iPhone) e poi
+carica i file estratti, NON lo ZIP.
+
+----------------------------------------
+ 3. FORZARE L'AGGIORNAMENTO (?v=2)
+----------------------------------------
+
+Se dopo un aggiornamento il browser mostra ancora la versione vecchia,
+aggiungi un parametro alla fine dell'indirizzo per "ingannare" la cache:
+
+       https://TUONOME.github.io/NOMEREPO/index.html?v=2
+
+Cambia il numero ogni volta che vuoi forzare il ricaricamento:
+?v=3, ?v=4, e così via.
+
+----------------------------------------
+ 4. SAFARI IPHONE MOSTRA UNA VECCHIA VERSIONE
+----------------------------------------
+
+Prova in quest'ordine:
+  1. Apri l'indirizzo con ?v=2 (vedi punto 3), cambiando il numero.
+  2. Tira la pagina verso il basso per ricaricare.
+  3. Chiudi del tutto la scheda e riaprila.
+  4. Impostazioni iPhone -> Safari -> "Cancella dati siti web e cronologia"
+     (ATTENZIONE: questo può cancellare i dati salvati di altri siti).
+
+NOTA: questa versione NON usa service worker né cache offline, quindi i
+problemi di cache sono ridotti al minimo. La cache offline potrà essere
+aggiunta in futuro, quando l'app sarà stabile.
+
+----------------------------------------
+ 5. ESPORTARE E IMPORTARE I DATI (JSON)
+----------------------------------------
+
+I dati sono salvati solo nel browser del dispositivo. Per non perderli
+(cambio telefono, pulizia dati, backup) usa Esporta/Importa.
+
+ESPORTARE:
+  - Apri l'app -> OPZIONI -> "Esporta JSON".
+  - Viene scaricato un file .json: conservalo in un posto sicuro
+    (es. app File, email a te stesso, cloud).
+
+IMPORTARE:
+  - Apri l'app -> OPZIONI -> "Importa JSON".
+  - Seleziona un file .json esportato in precedenza.
+  - Se il file è valido vedrai il messaggio "JSON importato".
+  - Se il file non è valido vedrai "Errore JSON non valido" e i dati
+    attuali NON verranno toccati.
+
+Suggerimento: esporta un backup prima di fare un Reset dati.
+
+----------------------------------------
+ 6. PRIMO AVVIO
+----------------------------------------
+
+Al primo avvio l'app è vuota e mostra la schermata "CONFIGURA CASA":
+  - Crea almeno un piano/area (es. "Piano Terra").
+  - Crea almeno una stanza (es. "Cucina").
+  - Il pulsante "Entra nell'app" si attiva solo quando esiste almeno
+    un piano/area E almeno una stanza.
+
+Dopo il primo avvio, piani/aree e stanze si gestiscono da OPZIONI.
+Dopo un Reset dati l'app torna alla schermata "CONFIGURA CASA".
+
+========================================
+ Buon lavoro con Casa App!
+========================================

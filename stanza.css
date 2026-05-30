@@ -1,6 +1,94 @@
-.room-hero { padding: 14px; position: relative; overflow: hidden; }
-.room-hero::after { content: ""; position: absolute; width: 180px; height: 180px; right: -80px; top: -70px; background: radial-gradient(circle, rgba(33,139,255,.38), transparent 62%); }
-.room-hero-content { position: relative; z-index: 1; }
-.room-title-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.room-stats { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.section-head { margin: 18px 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+/* ============================================================
+   STANZA — pagina dedicata della singola stanza
+   ============================================================ */
+
+.room-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--radius);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.room-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(155deg, rgba(255,255,255,0.18), rgba(0,0,0,0.22));
+}
+.room-hero-ico {
+  width: 56px; height: 56px;
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.18);
+  position: relative; z-index: 1;
+}
+.room-hero-ico .ico { width: 30px; height: 30px; stroke-width: 2; }
+.room-hero-info { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.room-hero-name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.room-hero-floor {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.95;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.room-hero-floor .ico { width: 15px; height: 15px; }
+
+.room-stat-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.room-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.room-stat .rs-ico {
+  width: 40px; height: 40px;
+  flex: none;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-weak);
+  color: var(--accent);
+}
+.room-stat > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.room-stat .rs-val { display: block; font-size: 20px; font-weight: 800; line-height: 1; }
+.room-stat .rs-lbl { display: block; font-size: 11.5px; color: var(--text-mut); font-weight: 600; margin-top: 4px; }
+
+.room-add-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.room-add-row .btn { flex: 1; }
+
+.room-notes {
+  font-size: 13.5px;
+  color: var(--text-soft);
+  line-height: 1.55;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  white-space: pre-wrap;
+}

@@ -1,17 +1,117 @@
-body.theme-light {
-  color-scheme: light;
-  --bg: #eef3f9;
-  --bg-soft: #ffffff;
-  --surface: rgba(255,255,255,.92);
-  --surface-2: rgba(235,242,250,.95);
-  --surface-3: rgba(220,231,244,.96);
-  --border: rgba(14,35,62,.12);
-  --border-strong: rgba(14,35,62,.2);
-  --text: #0b1727;
-  --muted: #5d6c80;
-  --muted-2: #738298;
-  --shadow: 0 18px 45px rgba(15,32,55,.14);
+/* ============================================================
+   THEMES — token colore per tema scuro (default) e chiaro
+   L'accento (--accent) viene impostato da app.js via JS
+   leggendo settings.accentColor.
+   ============================================================ */
+
+:root {
+  /* Accento (sovrascritto da JS). Default blu Casa App. */
+  --accent: #218bff;
+  --accent-weak: rgba(33, 139, 255, 0.14);
+  --accent-text: #ffffff;
+  /* Derivati dell'accento (ricalcolati da JS in base ad accentColor) */
+  --accent-glow: rgba(33, 139, 255, 0.40);
+  --accent-dim: rgba(33, 139, 255, 0.10);
+  --accent-line: rgba(33, 139, 255, 0.32);
+
+  /* Priorità */
+  --prio-alta: #ff5a5f;
+  --prio-media: #f5a623;
+  --prio-bassa: #38c172;
+
+  /* Stati lavoro */
+  --stato-da_fare: #8a93a6;
+  --stato-in_corso: #218bff;
+  --stato-in_attesa: #f5a623;
+  --stato-fatto: #38c172;
+
+  /* Stati idea */
+  --idea-bozza: #8a93a6;
+  --idea-da_valutare: #f5a623;
+  --idea-approvata: #38c172;
+  --idea-archiviata: #5a6478;
+
+  /* Raggi e ombre */
+  --radius-sm: 10px;
+  --radius: 16px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.6);
 }
-body.theme-light .app-shell { background: linear-gradient(180deg, #f7fbff, #eaf2fb); }
-body.theme-light .app-header { background: rgba(247,251,255,.9); }
-body.theme-light .bottom-nav { background: rgba(255,255,255,.86); }
+
+/* ---------- TEMA SCURO (default) ---------- */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b1220;
+  --bg-elev: #0f1a2e;
+  --surface: #131f36;
+  --surface-2: #1a2942;
+  --surface-3: #21314e;
+  --border: #243250;
+  --border-strong: #32456c;
+
+  --text: #eef3fb;
+  --text-soft: #b6c2d8;
+  --text-mut: #8593ab;
+  --text-faint: #5d6c87;
+
+  --header-bg: rgba(11, 18, 32, 0.82);
+  --nav-bg: rgba(13, 22, 40, 0.92);
+  --overlay: rgba(4, 8, 16, 0.66);
+
+  --danger: #ff5a5f;
+  --danger-weak: rgba(255, 90, 95, 0.14);
+  --success: #38c172;
+
+  /* Materiali "premium" */
+  --card-top: rgba(255, 255, 255, 0.045);
+  --card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --elev-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 18px 34px -20px rgba(0, 0, 0, 0.85);
+  --hairline: rgba(255, 255, 255, 0.07);
+  --app-bg:
+    radial-gradient(1100px 560px at 50% -12%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(800px 500px at 100% 0%, rgba(255, 255, 255, 0.03), transparent 55%),
+    linear-gradient(180deg, #0c1526 0%, #0a1020 45%, #070c16 100%);
+}
+
+/* ---------- TEMA CHIARO ---------- */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef2f8;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f3f6fb;
+  --surface-3: #e8eef7;
+  --border: #d9e1ee;
+  --border-strong: #c3cee0;
+
+  --text: #0f1b2d;
+  --text-soft: #33425c;
+  --text-mut: #5a6a85;
+  --text-faint: #8493ab;
+
+  --header-bg: rgba(238, 242, 248, 0.85);
+  --nav-bg: rgba(255, 255, 255, 0.92);
+  --overlay: rgba(15, 27, 45, 0.42);
+
+  --danger: #e23a3f;
+  --danger-weak: rgba(226, 58, 63, 0.12);
+  --success: #1f9d57;
+
+  --shadow-1: 0 1px 2px rgba(15, 27, 45, 0.08);
+  --shadow-2: 0 10px 28px rgba(15, 27, 45, 0.12);
+  --shadow-modal: 0 24px 60px rgba(15, 27, 45, 0.22);
+
+  /* Materiali "premium" (tema chiaro) */
+  --card-top: rgba(255, 255, 255, 0.7);
+  --card-inset: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --elev-shadow: 0 1px 2px rgba(15, 27, 45, 0.06), 0 18px 34px -22px rgba(15, 27, 45, 0.22);
+  --hairline: rgba(15, 27, 45, 0.05);
+  --app-bg:
+    radial-gradient(1000px 520px at 50% -12%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 60%),
+    linear-gradient(180deg, #eef3fb 0%, #e7edf6 100%);
+}

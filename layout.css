@@ -1,85 +1,174 @@
-.app-shell {
-  height: 100dvh;
-  max-width: 520px;
-  margin: 0 auto;
-  background:
-    radial-gradient(circle at top left, rgba(33, 139, 255, .2), transparent 35%),
-    linear-gradient(180deg, #07111f 0%, #091424 45%, #060d18 100%);
-  position: relative;
-  overflow: hidden;
-  border-left: 1px solid rgba(255,255,255,.07);
-  border-right: 1px solid rgba(255,255,255,.07);
+/* ============================================================
+   LAYOUT — header, area vista, bottom navigation, safe-area
+   ============================================================ */
+
+:root {
+  --max-w: 640px;
+  --header-h: 56px;
+  --nav-h: 64px;
+  --pad: 16px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* ---------- HEADER ---------- */
 .app-header {
-  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
-  padding: calc(18px + env(safe-area-inset-top, 0px)) 18px 12px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 20;
-  background: linear-gradient(180deg, rgba(7,17,31,.97), rgba(7,17,31,.86));
-  backdrop-filter: blur(18px);
-  border-bottom: 1px solid rgba(255,255,255,.06);
-}
-
-.eyebrow {
-  color: var(--accent-2);
-  text-transform: uppercase;
-  font-weight: 800;
-  font-size: .68rem;
-  letter-spacing: .16em;
-  margin-bottom: 4px;
-}
-
-.header-actions { display: flex; align-items: center; gap: 8px; }
-.app-main {
-  height: calc(100dvh - var(--header-height) - var(--nav-height) - env(safe-area-inset-top, 0px) - var(--safe-bottom));
-  overflow: auto;
-  padding: 16px 16px 26px;
-}
-
-.bottom-nav {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(10px + var(--safe-bottom));
-  height: 64px;
+  left: 0;
+  right: 0;
   z-index: 30;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  padding: 7px;
+  height: calc(var(--header-h) + var(--safe-top));
+  padding: var(--safe-top) var(--pad) 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--header-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--hairline), 0 10px 28px -22px rgba(0, 0, 0, 0.9);
+}
+
+.app-header .header-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header .header-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-mut);
+}
+
+.header-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  background: rgba(13, 25, 42, .86);
-  backdrop-filter: blur(18px);
-  border-radius: 22px;
-  box-shadow: var(--shadow);
+}
+.header-btn:active { background: var(--surface-3); }
+
+/* ---------- AREA VISTA ---------- */
+.view {
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: calc(var(--header-h) + var(--safe-top) + 14px) var(--pad)
+           calc(var(--nav-h) + var(--safe-bottom) + 28px);
+  min-height: 100dvh;
+}
+
+/* Quando header e nav sono nascosti (es. CONFIGURA CASA) */
+.view.is-fullscreen {
+  padding-top: calc(var(--safe-top) + 20px);
+  padding-bottom: calc(var(--safe-bottom) + 28px);
+  max-width: 720px;
+}
+
+/* ---------- BOTTOM NAVIGATION ---------- */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  height: calc(var(--nav-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  display: flex;
+  background: var(--nav-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -1px 0 var(--hairline), 0 -12px 30px -24px rgba(0, 0, 0, 0.9);
 }
 
 .nav-item {
-  border-radius: 17px;
-  background: transparent;
-  color: var(--muted);
+  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  gap: 2px;
-  font-size: .68rem;
-  font-weight: 700;
-}
-.nav-item .ico { font-size: 1.15rem; }
-.nav-item.active {
-  color: #fff;
-  background: linear-gradient(180deg, rgba(33,139,255,.28), rgba(33,139,255,.12));
-  box-shadow: inset 0 0 0 1px rgba(33,139,255,.32);
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  color: var(--text-mut);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  position: relative;
+  transition: color 0.2s ease;
 }
 
-@media (min-width: 760px) {
-  body { overflow: auto; background: #dce4ee; }
-  .app-shell { min-height: 900px; height: 900px; margin: 32px auto; border-radius: 38px; box-shadow: 0 24px 70px rgba(0,0,0,.35); }
+.nav-item .ico {
+  width: 23px;
+  height: 23px;
+  stroke-width: 1.9;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1.1), filter 0.22s ease;
 }
+
+.nav-item.is-active {
+  color: var(--accent);
+}
+.nav-item.is-active .ico {
+  transform: translateY(-1px) scale(1.1);
+  filter: drop-shadow(0 4px 9px var(--accent-glow));
+}
+
+/* Indicatore che scorre sotto la voce attiva (posizione via --i da app.js) */
+.nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / 5);
+  height: 3px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  transform: translateX(calc(var(--i, 0) * 100%));
+  transition: transform 0.34s cubic-bezier(0.4, 0.85, 0.25, 1), opacity 0.2s ease;
+}
+.nav-indicator::after {
+  content: "";
+  width: 30px;
+  height: 3px;
+  border-radius: 0 0 999px 999px;
+  background: var(--accent);
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+.nav-indicator.is-hidden { opacity: 0; }
+
+/* ---------- HELPERS LAYOUT ---------- */
+.section { margin-bottom: 22px; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-mut);
+}
+
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.grow { flex: 1; min-width: 0; }
+.wrap { flex-wrap: wrap; }

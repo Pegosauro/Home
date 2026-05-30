@@ -1,60 +1,1633 @@
-window.addEventListener('DOMContentLoaded', () => {
-  cleanupLegacyCache();
+/* ============================================================
+   CASA APP — app.js
+   JavaScript vanilla, nessun import/export, nessuna libreria.
+   Gestione click centralizzata (event delegation) per Safari iPhone.
+   ============================================================ */
+(function () {
+  "use strict";
 
-  CasaApp.state.init();
-  CasaApp.state.route = CasaApp.state.readHash();
-  CasaApp.state.subscribe(renderApp);
+  /* ==========================================================
+     CONFIG
+     ========================================================== */
+  var CONFIG = {
+    STORAGE_KEY: "casa-app-v2-data",
+    VERSION: "2.2.0",
+    DEFAULT_ACCENT: "#218bff",
+    ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
+    ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"]
+  };
 
-  window.addEventListener('hashchange', () => CasaApp.state.syncRouteFromHash());
+  var PRIO_LABEL = { alta: "Alta", media: "Media", bassa: "Bassa" };
+  var PRIO_RANK = { alta: 0, media: 1, bassa: 2 };
+  var STATUS_LABEL = { da_fare: "Da fare", in_corso: "In corso", in_attesa: "In attesa", fatto: "Fatto" };
+  var IDEA_LABEL = { bozza: "Bozza", da_valutare: "Da valutare", approvata: "Approvata", archiviata: "Archiviata" };
 
-  document.getElementById('jsonImportInput').addEventListener('change', async event => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // Icone SVG inline (inner markup, viewBox 0 0 24 24)
+  var ICONS = {
+    home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/>',
+    tasks: '<path d="M4 6.5 5.5 8 8 5"/><path d="M4 12.5 5.5 14 8 11"/><path d="M4 18.5 5.5 20 8 17"/><path d="M11 6h9"/><path d="M11 12h9"/><path d="M11 18h9"/>',
+    bulb: '<path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.8 10.7c.5.4.8 1 .8 1.6V16h6v-.7c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/>',
+    settings: '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/>',
+    plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+    x: '<path d="M18 6 6 18"/><path d="M6 6l12 12"/>',
+    chevron: '<path d="M9 6l6 6-6 6"/>',
+    back: '<path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    checkCircle: '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5 11 15l4.5-5"/>',
+    alert: '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+    download: '<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>',
+    upload: '<path d="M12 21V9"/><path d="M7 14l5-5 5 5"/><path d="M5 3h14"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4 12H2"/><path d="M22 12h-2"/><path d="M5 5l1.4 1.4"/><path d="M17.6 17.6 19 19"/><path d="M19 5l-1.4 1.4"/><path d="M6.4 17.6 5 19"/>',
+    moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>',
+    palette: '<path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.6 0-.4-.2-.8-.5-1-.3-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4H16a5 5 0 0 0 5-5c0-4.5-4-8-9-8z"/><circle cx="7.5" cy="10.5" r="1.1"/><circle cx="12" cy="7.5" r="1.1"/><circle cx="16.5" cy="10.5" r="1.1"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    key: '<circle cx="7.5" cy="15.5" r="4"/><path d="M10.3 12.7 21 2"/><path d="M16.5 6.5l3 3"/><path d="M14.5 8.5l2 2"/>',
+    layers: '<path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/>',
+    pin: '<path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/>',
+    file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 4v4h-4"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    cart: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.3 11.4a1 1 0 0 0 1 .8h8.7a1 1 0 0 0 1-.8L21 7H6"/>',
+    listcheck: '<path d="M11 6h10"/><path d="M11 12h10"/><path d="M11 18h10"/><path d="M3 6.5 4.2 7.7 6.5 5"/><path d="M3 12.5 4.2 13.7 6.5 11"/><path d="M3 18.5 4.2 19.7 6.5 17"/>',
+    extlink: '<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+    coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.9-2.5 2s1.1 2 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2c-1 0-2-.4-2.5-1.2"/><path d="M12 6.5v11"/>',
+    // Icone stanze
+    door: '<path d="M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><path d="M13 12h.01"/>',
+    living: '<path d="M3 10V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3"/><path d="M3 14a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4H3z"/><path d="M6 20v1"/><path d="M18 20v1"/>',
+    bed: '<path d="M2 9v10"/><path d="M2 13h18a2 2 0 0 1 2 2v4"/><path d="M6 13V9a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v4"/>',
+    kitchen: '<path d="M7 3v8"/><path d="M5 3v3a2 2 0 0 0 2 2"/><path d="M9 3v3a2 2 0 0 1-2 2"/><path d="M7 11v10"/><path d="M17 3c-1.7 0-3 2-3 4.5S15.3 11 17 11"/><path d="M17 3v18"/>',
+    bath: '<path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 4 0"/><path d="M8 19l-1 2"/><path d="M17 19l1 2"/>',
+    work: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8"/><path d="M12 16v4"/>',
+    wardrobe: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M12 3v18"/><path d="M10 11h.01"/><path d="M14 11h.01"/>',
+    garage: '<path d="M3 13l1.7-5a2 2 0 0 1 1.9-1.3h10.8a2 2 0 0 1 1.9 1.3L21 13v5h-2v-2H5v2H3z"/><circle cx="7.5" cy="15.5" r="1.1"/><circle cx="16.5" cy="15.5" r="1.1"/>',
+    storage: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>',
+    plant: '<path d="M12 22V11"/><path d="M12 13c0-3 2.2-5 5.5-5 0 3.3-2.2 5-5.5 5z"/><path d="M12 16c0-3-2.2-5-5.5-5 0 3.3 2.2 5 5.5 5z"/>',
+    laundry: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="14" r="3.6"/><path d="M8 6.5h.01"/><path d="M11 6.5h.01"/>',
+    stairs: '<path d="M4 20h4v-4h4v-4h4V8h4"/>'
+  };
+
+  var ROOM_ICON_KEYS = ["living", "bed", "kitchen", "bath", "work", "wardrobe", "garage", "storage", "plant", "laundry", "stairs", "door"];
+
+  /* ==========================================================
+     STATE
+     ========================================================== */
+  var state = {
+    data: null,            // dati applicativi (vedi DATA MODEL)
+    filterPrio: "tutti",   // filtro corrente sezione LAVORI
+    currentTaskId: null,   // lavoro aperto nella pagina dettaglio
+    currentIdeaId: null,   // idea aperta nella pagina dettaglio
+    manageFloorId: null    // piano in gestione (drill-down stanze in Opzioni)
+  };
+
+  var pendingConfirm = null; // callback conferma azione distruttiva
+  var pendingCancel = null;
+
+  // Riferimenti DOM principali
+  var elHeader, elView, elNav, elToast, elModal;
+
+  /* ==========================================================
+     STORAGE
+     ========================================================== */
+  function loadData() {
     try {
-      const imported = await CasaApp.storage.importFile(file);
-      CasaApp.state.setData(imported);
-      alert('Importazione completata.');
-    } catch (error) {
-      alert('File JSON non valido.');
-      console.error(error);
-    } finally {
-      event.target.value = '';
+      var raw = localStorage.getItem(CONFIG.STORAGE_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || typeof obj !== "object" || !obj.house) return null;
+      return normalizeData(obj);
+    } catch (e) {
+      return null;
     }
-  });
-
-  renderApp();
-});
-
-function cleanupLegacyCache() {
-  // Durante lo sviluppo su GitHub Pages evita che vecchi service worker/cache
-  // continuino a mostrare versioni precedenti dell'app.
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations?.().then(registrations => {
-      registrations.forEach(registration => registration.unregister());
-    }).catch(console.warn);
-  }
-  if ('caches' in window) {
-    caches.keys().then(keys => keys.forEach(key => caches.delete(key))).catch(console.warn);
-  }
-}
-
-function renderApp() {
-  const root = document.getElementById('app');
-  const route = CasaApp.state.route || { view: 'home', params: {} };
-  const view = route.view || 'home';
-
-  if (CasaApp.state.needsSetup()) {
-    document.getElementById('bottomNav').innerHTML = '';
-    CasaApp.views.setup(root);
-    return;
   }
 
-  CasaApp.components.renderNav(view === 'stanza' ? 'home' : view);
+  function persist() {
+    if (!state.data) return;
+    state.data.updatedAt = nowISO();
+    try {
+      localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(state.data));
+    } catch (e) {
+      toast("Spazio di salvataggio pieno", "error");
+    }
+  }
 
-  if (view === 'home') CasaApp.views.home(root, route.params);
-  else if (view === 'lavori') CasaApp.views.lavori(root, route.params);
-  else if (view === 'idee') CasaApp.views.idee(root, route.params);
-  else if (view === 'opzioni') CasaApp.views.opzioni(root, route.params);
-  else if (view === 'stanza') CasaApp.views.stanza(root, route.params);
-  else CasaApp.views.home(root, route.params);
-}
+  /* ==========================================================
+     DATA MODEL
+     ========================================================== */
+  function createDefaultData() {
+    var iso = nowISO();
+    return {
+      version: CONFIG.VERSION,
+      settings: { theme: "dark", accentColor: CONFIG.DEFAULT_ACCENT, compactMode: false },
+      house: { floors: [], rooms: [] },
+      tasks: [],
+      ideas: [],
+      shopping: [],
+      createdAt: iso,
+      updatedAt: iso
+    };
+  }
+
+  // Garantisce che un oggetto importato/caricato abbia tutti i campi
+  function normalizeData(obj) {
+    var d = createDefaultData();
+    // d.version resta CONFIG.VERSION: normalizziamo sempre allo schema corrente.
+    if (obj.settings && typeof obj.settings === "object") {
+      d.settings.theme = obj.settings.theme === "light" ? "light" : "dark";
+      d.settings.accentColor = isHex(obj.settings.accentColor) ? obj.settings.accentColor : CONFIG.DEFAULT_ACCENT;
+      d.settings.compactMode = !!obj.settings.compactMode;
+    }
+    if (obj.house && typeof obj.house === "object") {
+      d.house.floors = Array.isArray(obj.house.floors) ? obj.house.floors : [];
+      d.house.rooms = Array.isArray(obj.house.rooms) ? obj.house.rooms : [];
+    }
+    d.tasks = (Array.isArray(obj.tasks) ? obj.tasks : []).map(function (t) {
+      t.checklist = Array.isArray(t.checklist) ? t.checklist : [];
+      return t;
+    });
+    d.ideas = (Array.isArray(obj.ideas) ? obj.ideas : []).map(function (i) {
+      i.checklist = Array.isArray(i.checklist) ? i.checklist : [];
+      i.link = typeof i.link === "string" ? i.link : "";
+      i.cost = typeof i.cost === "string" ? i.cost : (i.cost != null ? String(i.cost) : "");
+      return i;
+    });
+    d.shopping = (Array.isArray(obj.shopping) ? obj.shopping : []).map(function (s) {
+      // Migrazione: il vecchio campo roomId diventa un collegamento generico.
+      var linkType = s.linkType || (s.roomId ? "room" : "");
+      var linkId = s.linkId || (s.roomId || null);
+      if (!linkId) linkType = "";
+      return {
+        id: s.id || uid("shop"), text: s.text || "", qty: s.qty || "",
+        linkType: linkType, linkId: linkId,
+        done: !!s.done, createdAt: s.createdAt || nowISO()
+      };
+    });
+    d.createdAt = obj.createdAt || d.createdAt;
+    d.updatedAt = obj.updatedAt || d.updatedAt;
+    return d;
+  }
+
+  function createFloor(name) {
+    return { id: uid("floor"), name: name, order: state.data.house.floors.length + 1 };
+  }
+  function createRoom(name, floorId, opts) {
+    opts = opts || {};
+    return {
+      id: uid("room"),
+      floorId: floorId,
+      name: name,
+      icon: opts.icon || "door",
+      color: opts.color || CONFIG.DEFAULT_ACCENT,
+      order: state.data.house.rooms.length + 1,
+      notes: opts.notes || ""
+    };
+  }
+  function createTask(d) {
+    var iso = nowISO();
+    return {
+      id: uid("task"), roomId: d.roomId, title: d.title, description: d.description || "",
+      priority: d.priority || "media", status: d.status || "da_fare",
+      checklist: [],
+      createdAt: iso, updatedAt: iso, completedAt: d.status === "fatto" ? iso : null
+    };
+  }
+  function createCheckItem(text) {
+    return { id: uid("chk"), text: text, done: false };
+  }
+  function createShopItem(d) {
+    return {
+      id: uid("shop"), text: d.text, qty: d.qty || "",
+      linkType: d.linkType || "", linkId: d.linkId || null,
+      done: false, createdAt: nowISO()
+    };
+  }
+  function createIdea(d) {
+    var iso = nowISO();
+    return {
+      id: uid("idea"), roomId: d.roomId, title: d.title, description: d.description || "",
+      status: d.status || "bozza", link: d.link || "", cost: d.cost || "",
+      checklist: [], createdAt: iso, updatedAt: iso
+    };
+  }
+
+  // --- query helpers sul modello ---
+  function floors() { return state.data.house.floors.slice().sort(byOrderName); }
+  function rooms() { return state.data.house.rooms.slice().sort(byOrderName); }
+  function roomsOf(floorId) { return rooms().filter(function (r) { return r.floorId === floorId; }); }
+  function tasksOf(roomId) { return state.data.tasks.filter(function (t) { return t.roomId === roomId; }); }
+  function ideasOf(roomId) { return state.data.ideas.filter(function (i) { return i.roomId === roomId; }); }
+  function openTasksOf(roomId) { return tasksOf(roomId).filter(function (t) { return t.status !== "fatto"; }); }
+  function findFloor(id) { return state.data.house.floors.filter(function (f) { return f.id === id; })[0]; }
+  function findRoom(id) { return state.data.house.rooms.filter(function (r) { return r.id === id; })[0]; }
+  function findTask(id) { return state.data.tasks.filter(function (t) { return t.id === id; })[0]; }
+  function findIdea(id) { return state.data.ideas.filter(function (i) { return i.id === id; })[0]; }
+  function findShop(id) { return state.data.shopping.filter(function (s) { return s.id === id; })[0]; }
+  // Proprietario della checklist in base alla pagina dettaglio aperta (lavoro o idea)
+  function currentChecklistOwner() {
+    var r = parseHash();
+    if (r.name === "lavoro") return findTask(r.param);
+    if (r.name === "idea") return findIdea(r.param);
+    return null;
+  }
+  function floorNameOf(id) { var f = findFloor(id); return f ? f.name : "—"; }
+  function roomFloorName(roomId) { var r = findRoom(roomId); return r ? floorNameOf(r.floorId) : "—"; }
+
+  function byOrderName(a, b) {
+    var ao = a.order || 0, bo = b.order || 0;
+    if (ao !== bo) return ao - bo;
+    return String(a.name).localeCompare(String(b.name), "it");
+  }
+
+  // --- mutazioni con cascata ---
+  function deleteFloor(id) {
+    var rs = roomsOf(id);
+    for (var i = 0; i < rs.length; i++) deleteRoom(rs[i].id);
+    state.data.house.floors = state.data.house.floors.filter(function (f) { return f.id !== id; });
+    persist();
+  }
+  function deleteRoom(id) {
+    // Scollega (senza eliminarli) gli articoli di spesa legati alla stanza
+    // e ai lavori/idee che stanno per essere rimossi con essa.
+    tasksOf(id).forEach(function (t) { unlinkShopping("task", t.id); });
+    ideasOf(id).forEach(function (i) { unlinkShopping("idea", i.id); });
+    unlinkShopping("room", id);
+    state.data.house.rooms = state.data.house.rooms.filter(function (r) { return r.id !== id; });
+    state.data.tasks = state.data.tasks.filter(function (t) { return t.roomId !== id; });
+    state.data.ideas = state.data.ideas.filter(function (i) { return i.roomId !== id; });
+    persist();
+  }
+
+  // Scollega gli articoli di spesa legati a un certo elemento (li mantiene in lista).
+  function unlinkShopping(type, id) {
+    state.data.shopping.forEach(function (s) {
+      if (s.linkType === type && s.linkId === id) { s.linkType = ""; s.linkId = null; }
+    });
+  }
+  function shoppingLinkedTo(type, id) {
+    return state.data.shopping.filter(function (s) { return s.linkType === type && s.linkId === id; });
+  }
+
+  /* ==========================================================
+     ROUTER (hash routing semplice)
+     ========================================================== */
+  function parseHash() {
+    var raw = (location.hash || "").replace(/^#/, "");
+    if (!raw) return { name: "home" };
+    var parts = raw.split("/");
+    if (parts[0] === "stanza") return { name: "stanza", param: parts[1] || "" };
+    if (parts[0] === "lavoro") return { name: "lavoro", param: parts[1] || "" };
+    if (parts[0] === "idea") return { name: "idea", param: parts[1] || "" };
+    if (parts[0] === "lavori" || parts[0] === "idee" || parts[0] === "spesa" || parts[0] === "opzioni" || parts[0] === "home") {
+      return { name: parts[0] };
+    }
+    return { name: "home" };
+  }
+
+  function navigate(hash) {
+    if (location.hash === hash) { render(); }
+    else { location.hash = hash; }
+  }
+
+  function needsSetup() {
+    return state.data.house.floors.length === 0 || state.data.house.rooms.length === 0;
+  }
+
+  /* ==========================================================
+     RENDER
+     ========================================================== */
+  function applySettings() {
+    var s = state.data.settings;
+    document.documentElement.setAttribute("data-theme", s.theme === "light" ? "light" : "dark");
+    var accent = isHex(s.accentColor) ? s.accentColor : CONFIG.DEFAULT_ACCENT;
+    var root = document.documentElement.style;
+    root.setProperty("--accent", accent);
+    root.setProperty("--accent-weak", hexToRgba(accent, 0.14));
+    root.setProperty("--accent-glow", hexToRgba(accent, 0.40));
+    root.setProperty("--accent-dim", hexToRgba(accent, 0.10));
+    root.setProperty("--accent-line", hexToRgba(accent, 0.32));
+    document.body.classList.toggle("compact", !!s.compactMode);
+  }
+
+  function renderSetup() {
+    applySettings();
+    elHeader.hidden = true;
+    elNav.hidden = true;
+    elView.classList.add("is-fullscreen");
+    elView.innerHTML = viewSetup();
+    window.scrollTo(0, 0);
+    animateIn();
+  }
+
+  function render() {
+    applySettings();
+    if (needsSetup()) { renderSetup(); return; }
+    var route = parseHash();
+    elHeader.hidden = false;
+    elNav.hidden = false;
+    elView.classList.remove("is-fullscreen");
+    elHeader.innerHTML = headerHtml(route);
+    if (!elNav.dataset.built) { elNav.innerHTML = navHtml(); elNav.dataset.built = "1"; }
+    updateNav(route.name);
+
+    var body = "";
+    switch (route.name) {
+      case "home": body = viewHome(); break;
+      case "lavori": body = viewLavori(); break;
+      case "idee": body = viewIdee(); break;
+      case "spesa": body = viewSpesa(); break;
+      case "opzioni": body = viewOpzioni(); break;
+      case "stanza": body = viewStanza(route.param); break;
+      case "lavoro": body = viewTaskDetail(route.param); break;
+      case "idea": body = viewIdeaDetail(route.param); break;
+      default: navigate("#home"); return;
+    }
+    elView.innerHTML = body;
+    window.scrollTo(0, 0);
+    animateIn();
+  }
+
+  // Entrata a cascata degli elementi di primo livello della vista corrente
+  function animateIn() {
+    if (prefersReducedMotion()) return;
+    var kids = elView.children;
+    for (var i = 0; i < kids.length; i++) {
+      kids[i].style.animationDelay = Math.min(i, 6) * 45 + "ms";
+      kids[i].classList.add("anim-in");
+    }
+  }
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  function headerHtml(route) {
+    if (route.name === "stanza") {
+      var r = findRoom(route.param);
+      return '<button class="header-btn" data-action="back-home" aria-label="Torna alla Home">' + svg("back") + "</button>" +
+        '<div class="grow"><div class="header-title">' + h(r ? r.name : "Stanza") + "</div></div>";
+    }
+    if (route.name === "lavoro") {
+      var t = findTask(route.param);
+      return '<button class="header-btn" data-action="back-task" aria-label="Indietro">' + svg("back") + "</button>" +
+        '<div class="grow"><div class="header-title">' + h(t ? t.title : "Lavoro") + "</div></div>";
+    }
+    if (route.name === "idea") {
+      var idd = findIdea(route.param);
+      return '<button class="header-btn" data-action="back-idea" aria-label="Indietro">' + svg("back") + "</button>" +
+        '<div class="grow"><div class="header-title">' + h(idd ? idd.title : "Idea") + "</div></div>";
+    }
+    var titles = { home: "Casa App", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
+    return '<div class="grow"><div class="header-title">' + titles[route.name] + "</div></div>";
+  }
+
+  var NAV_ITEMS = [
+    { r: "home", l: "Home", i: "home" },
+    { r: "lavori", l: "Lavori", i: "tasks" },
+    { r: "idee", l: "Idee", i: "bulb" },
+    { r: "spesa", l: "Spesa", i: "cart" },
+    { r: "opzioni", l: "Opzioni", i: "settings" }
+  ];
+
+  function navHtml() {
+    var items = NAV_ITEMS.map(function (it) {
+      return '<button class="nav-item" data-action="go" data-route="' + it.r + '" aria-label="' + it.l + '">' +
+        svg(it.i) + "<span>" + it.l + "</span></button>";
+    }).join("");
+    return items + '<span class="nav-indicator" aria-hidden="true"></span>';
+  }
+
+  // Indice della voce di nav attiva: le pagine dettaglio illuminano la sezione padre
+  function activeNavIndex(routeName) {
+    var map = { lavoro: "lavori", idea: "idee", stanza: "home" };
+    var r = map[routeName] || routeName;
+    for (var i = 0; i < NAV_ITEMS.length; i++) if (NAV_ITEMS[i].r === r) return i;
+    return -1;
+  }
+
+  function updateNav(routeName) {
+    var idx = activeNavIndex(routeName);
+    var items = elNav.querySelectorAll(".nav-item");
+    for (var i = 0; i < items.length; i++) items[i].classList.toggle("is-active", i === idx);
+    var ind = elNav.querySelector(".nav-indicator");
+    if (ind) {
+      if (idx < 0) { ind.classList.add("is-hidden"); }
+      else { ind.classList.remove("is-hidden"); ind.style.setProperty("--i", idx); }
+    }
+  }
+
+  /* ==========================================================
+     VIEWS
+     ========================================================== */
+
+  // ---------- CONFIGURA CASA (onboarding) ----------
+  function viewSetup() {
+    var fl = floors();
+    var rm = rooms();
+    var canEnter = fl.length > 0 && rm.length > 0;
+
+    var floorChips = fl.length
+      ? '<div class="setup-chiplist">' + fl.map(function (f) {
+          return '<span class="setup-chip"><span class="chip-swatch" style="background:var(--accent)"></span>' + h(f.name) +
+            '<button class="chip-x" data-action="setup-del-floor" data-id="' + f.id + '" aria-label="Elimina piano">' + svg("x") + "</button></span>";
+        }).join("") + "</div>"
+      : '<div class="setup-empty-mini">Nessun piano/area ancora.</div>';
+
+    var roomChips = rm.length
+      ? '<div class="setup-chiplist">' + rm.map(function (r) {
+          return '<span class="setup-chip"><span class="chip-swatch" style="background:' + h(r.color) + '"></span>' + h(r.name) +
+            '<button class="chip-x" data-action="setup-del-room" data-id="' + r.id + '" aria-label="Elimina stanza">' + svg("x") + "</button></span>";
+        }).join("") + "</div>"
+      : '<div class="setup-empty-mini">Nessuna stanza ancora.</div>';
+
+    var floorOptions = fl.map(function (f) { return '<option value="' + f.id + '">' + h(f.name) + "</option>"; }).join("");
+    var roomFormDisabled = fl.length === 0;
+
+    return '' +
+      '<div class="setup">' +
+        '<div class="setup-hero">' +
+          '<div class="setup-logo">' + svg("home") + "</div>" +
+          "<h1>Configura Casa</h1>" +
+          "<p>Crea almeno un piano/area e una stanza per iniziare a usare l'app.</p>" +
+        "</div>" +
+
+        '<div class="setup-step' + (fl.length ? " is-done" : "") + '">' +
+          '<div class="setup-step-head">' +
+            '<span class="setup-step-num">' + (fl.length ? svgRaw("check", "ico-sm") : "1") + "</span>" +
+            "<h2>Piani / Aree</h2>" +
+            '<span class="step-count">' + fl.length + "</span>" +
+          "</div>" +
+          floorChips +
+          '<form class="setup-inline-form" data-action="setup-add-floor">' +
+            '<input class="input" type="text" name="floorName" placeholder="Es. Piano Terra" maxlength="40" autocomplete="off" />' +
+            '<button class="setup-inline-add" type="submit" aria-label="Aggiungi piano">' + svg("plus") + "</button>" +
+          "</form>" +
+        "</div>" +
+
+        '<div class="setup-step' + (rm.length ? " is-done" : "") + '">' +
+          '<div class="setup-step-head">' +
+            '<span class="setup-step-num">' + (rm.length ? svgRaw("check", "ico-sm") : "2") + "</span>" +
+            "<h2>Stanze</h2>" +
+            '<span class="step-count">' + rm.length + "</span>" +
+          "</div>" +
+          roomChips +
+          (roomFormDisabled
+            ? '<div class="field-hint">Aggiungi prima un piano/area qui sopra.</div>'
+            : '<form class="setup-inline-form" data-action="setup-add-room">' +
+                '<input class="input" type="text" name="roomName" placeholder="Es. Cucina" maxlength="40" autocomplete="off" />' +
+                '<select class="select" name="floorId" aria-label="Piano della stanza">' + floorOptions + "</select>" +
+                '<button class="setup-inline-add" type="submit" aria-label="Aggiungi stanza">' + svg("plus") + "</button>" +
+              "</form>") +
+        "</div>" +
+
+        '<div class="setup-cta">' +
+          '<button class="btn btn-primary btn-block" data-action="setup-enter"' + (canEnter ? "" : ' aria-disabled="true"') + ">" +
+            "Entra nell'app" + svg("chevron") +
+          "</button>" +
+          '<button class="btn btn-ghost btn-block" style="margin-top:10px" data-action="import-json">' + svg("upload") + "Importa backup JSON</button>" +
+          '<p class="setup-note">Hai un backup da un altro dispositivo? Importalo qui. Potrai gestire piani/aree e stanze in qualsiasi momento da Opzioni.</p>' +
+        "</div>" +
+      "</div>";
+  }
+
+  // ---------- HOME ----------
+  function viewHome() {
+    var tasks = state.data.tasks;
+    var total = tasks.length;
+    var open = tasks.filter(function (t) { return t.status !== "fatto"; }).length;
+    var alta = tasks.filter(function (t) { return t.priority === "alta" && t.status !== "fatto"; }).length;
+    var done = tasks.filter(function (t) { return t.status === "fatto"; }).length;
+    var ideasN = state.data.ideas.length;
+
+    var stats =
+      '<div class="stat-grid">' +
+        stat(total, "Lavori", "") +
+        stat(open, "Aperti", "accent") +
+        stat(alta, "Alta prio.", "alta") +
+        stat(done, "Completati", "fatto") +
+        stat(ideasN, "Idee", "") +
+      "</div>";
+
+    var fl = floors();
+    var floorsHtml = fl.map(function (f) {
+      var rs = roomsOf(f.id);
+      var roomsHtml = rs.length
+        ? '<div class="stack">' + rs.map(roomCard).join("") + "</div>"
+        : '<div class="map-floor-empty">Nessuna stanza in questo piano.</div>';
+      return '<div class="floor-group">' +
+        '<div class="floor-head"><span class="floor-name">' + h(f.name) + "</span>" +
+        '<span class="floor-line"></span><span class="floor-count">' + rs.length + " stanze</span></div>" +
+        roomsHtml + "</div>";
+    }).join("");
+
+    return '' +
+      '<section class="section">' + stats + "</section>" +
+      '<section class="section"><div class="section-head"><h2>La tua casa</h2></div>' + floorsHtml + "</section>";
+  }
+
+  function stat(val, label, mod) {
+    return '<div class="stat ' + mod + '"><span class="stat-val mono">' + val + '</span><span class="stat-lbl">' + label + "</span></div>";
+  }
+
+  function roomCard(r) {
+    var open = openTasksOf(r.id).length;
+    var ideasN = ideasOf(r.id).length;
+    return '<button class="card card-tap room-card" data-action="open-room" data-id="' + r.id + '">' +
+      '<span class="room-ico" style="background:' + h(r.color) + '">' + svg(roomIcon(r.icon)) + "</span>" +
+      '<span class="room-info">' +
+        '<span class="room-name">' + h(r.name) + "</span>" +
+        '<span class="room-counts">' +
+          '<span class="count-pill">' + svg("tasks", "ico-sm") + open + " aperti</span>" +
+          '<span class="count-pill">' + svg("bulb", "ico-sm") + ideasN + " idee</span>" +
+        "</span>" +
+      "</span>" +
+      '<span class="room-chevron">' + svg("chevron") + "</span>" +
+      "</button>";
+  }
+
+  // ---------- LAVORI ----------
+  function viewLavori() {
+    var filt = state.filterPrio;
+    var segs = [["tutti", "Tutti"], ["alta", "Alta"], ["media", "Media"], ["bassa", "Bassa"]];
+    var seg = '<div class="segmented filter-bar">' + segs.map(function (s) {
+      return '<button class="seg-btn' + (filt === s[0] ? " is-active" : "") + '" data-action="filter-prio" data-prio="' + s[0] + '">' + s[1] + "</button>";
+    }).join("") + "</div>";
+
+    var list = state.data.tasks.slice();
+    if (filt !== "tutti") list = list.filter(function (t) { return t.priority === filt; });
+    list.sort(function (a, b) {
+      if (PRIO_RANK[a.priority] !== PRIO_RANK[b.priority]) return PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+
+    var body = list.length
+      ? '<div class="stack">' + list.map(taskCard).join("") + "</div>"
+      : emptyState("tasks", "Nessun lavoro", filt === "tutti"
+          ? "Aggiungi il primo lavoro con il pulsante +."
+          : "Nessun lavoro con questa priorità.");
+
+    return seg + body + fab("add-task", "Aggiungi lavoro");
+  }
+
+  function taskCard(t) {
+    var chk = t.checklist || [];
+    var doneN = chk.filter(function (c) { return c.done; }).length;
+    var chkPill = chk.length
+      ? '<span class="count-pill">' + svg("listcheck", "ico-sm") + doneN + "/" + chk.length + "</span>"
+      : "";
+    var shop = shoppingLinkedTo("task", t.id);
+    var shopPill = shop.length
+      ? '<span class="count-pill">' + svg("cart", "ico-sm") + shop.filter(function (s) { return !s.done; }).length + "/" + shop.length + "</span>"
+      : "";
+    return '<div class="card card-tap task-card prio-' + t.priority + '" data-action="open-task" data-id="' + t.id + '">' +
+      '<div class="task-top">' +
+        '<span class="task-title' + (t.status === "fatto" ? " is-done" : "") + '">' + h(t.title) + "</span>" +
+        '<div class="task-actions">' +
+          iconBtn("edit-task", t.id, "pencil", "Modifica lavoro") +
+          iconBtn("del-task", t.id, "trash", "Elimina lavoro", true) +
+        "</div>" +
+      "</div>" +
+      '<div class="task-loc">' + svg("pin", "ico-sm") + h(roomName(t.roomId)) +
+        '<span class="sep">•</span>' + h(roomFloorName(t.roomId)) + "</div>" +
+      '<div class="task-badges">' + (t.status === "fatto" ? "" : prioBadge(t.priority)) + statusBadge(t.status) + chkPill + shopPill + "</div>" +
+      "</div>";
+  }
+
+  // ---------- IDEE ----------
+  function viewIdee() {
+    var list = state.data.ideas.slice().sort(function (a, b) {
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+    var body = list.length
+      ? '<div class="stack">' + list.map(ideaCard).join("") + "</div>"
+      : emptyState("bulb", "Nessuna idea", "Annota la tua prima idea progettuale con il pulsante +.");
+    return body + fab("add-idea", "Aggiungi idea");
+  }
+
+  function ideaCard(i) {
+    var shop = shoppingLinkedTo("idea", i.id);
+    var shopPill = shop.length
+      ? '<span class="count-pill">' + svg("cart", "ico-sm") + shop.filter(function (s) { return !s.done; }).length + "/" + shop.length + "</span>"
+      : "";
+    var clist = i.checklist || [];
+    var clistPill = clist.length
+      ? '<span class="count-pill">' + svg("listcheck", "ico-sm") + clist.filter(function (c) { return c.done; }).length + "/" + clist.length + "</span>"
+      : "";
+    var costBadge = i.cost ? '<span class="badge badge-soft idea-cost">' + svg("coin", "ico-sm") + h(i.cost) + "</span>" : "";
+    return '<div class="card card-tap idea-card" data-action="open-idea" data-id="' + i.id + '">' +
+      '<div class="idea-top">' +
+        '<span class="idea-title">' + h(i.title) + "</span>" +
+        '<div class="idea-actions">' +
+          iconBtn("edit-idea", i.id, "pencil", "Modifica idea") +
+          iconBtn("del-idea", i.id, "trash", "Elimina idea", true) +
+        "</div>" +
+      "</div>" +
+      '<div class="idea-loc">' + svg("pin", "ico-sm") + h(roomName(i.roomId)) +
+        '<span class="sep">•</span>' + h(roomFloorName(i.roomId)) + "</div>" +
+      (i.description ? '<div class="idea-desc">' + h(i.description) + "</div>" : "") +
+      '<div class="idea-foot">' + ideaBadge(i.status) + costBadge + clistPill + shopPill + "</div>" +
+      "</div>";
+  }
+
+  // ---------- PAGINA STANZA ----------
+  function viewStanza(roomId) {
+    var r = findRoom(roomId);
+    if (!r) {
+      return emptyState("alert", "Stanza non trovata", "Questa stanza non esiste più.") +
+        '<button class="btn btn-block" data-action="back-home">Torna alla Home</button>';
+    }
+    var openN = openTasksOf(r.id).length;
+    var ideasN = ideasOf(r.id).length;
+    var tlist = tasksOf(r.id).slice().sort(function (a, b) {
+      if (PRIO_RANK[a.priority] !== PRIO_RANK[b.priority]) return PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+    var ilist = ideasOf(r.id).slice().sort(function (a, b) {
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+
+    var tasksBlock = tlist.length
+      ? '<div class="stack">' + tlist.map(taskCard).join("") + "</div>"
+      : emptyState("tasks", "Nessun lavoro", "Aggiungi un lavoro per questa stanza.");
+    var ideasBlock = ilist.length
+      ? '<div class="stack">' + ilist.map(ideaCard).join("") + "</div>"
+      : emptyState("bulb", "Nessuna idea", "Aggiungi un'idea per questa stanza.");
+
+    return '' +
+      '<div class="room-hero" style="background:' + h(r.color) + '">' +
+        '<span class="room-hero-ico">' + svg(roomIcon(r.icon)) + "</span>" +
+        '<span class="room-hero-info">' +
+          '<span class="room-hero-name">' + h(r.name) + "</span>" +
+          '<span class="room-hero-floor">' + svg("layers", "ico-sm") + h(floorNameOf(r.floorId)) + "</span>" +
+        "</span>" +
+      "</div>" +
+
+      '<div class="room-stat-row">' +
+        '<div class="room-stat"><span class="rs-ico">' + svg("tasks") + '</span><span><span class="rs-val mono">' + openN + '</span><span class="rs-lbl">Lavori aperti</span></span></div>' +
+        '<div class="room-stat"><span class="rs-ico">' + svg("bulb") + '</span><span><span class="rs-val mono">' + ideasN + '</span><span class="rs-lbl">Idee</span></span></div>' +
+      "</div>" +
+
+      '<div class="room-add-row">' +
+        '<button class="btn btn-primary" data-action="add-task-room" data-room="' + r.id + '">' + svg("plus") + "Lavoro</button>" +
+        '<button class="btn" data-action="add-idea-room" data-room="' + r.id + '">' + svg("plus") + "Idea</button>" +
+      "</div>" +
+
+      (r.notes ? '<div class="room-notes">' + h(r.notes) + "</div>" : "") +
+
+      '<section class="section"><div class="section-head"><h2>Lavori</h2></div>' + tasksBlock + "</section>" +
+      '<section class="section"><div class="section-head"><h2>Idee</h2></div>' + ideasBlock + "</section>";
+  }
+
+  // ---------- DETTAGLIO LAVORO + CHECKLIST ----------
+  function viewTaskDetail(taskId) {
+    state.currentTaskId = taskId;
+    var t = findTask(taskId);
+    if (!t) {
+      return emptyState("alert", "Lavoro non trovato", "Questo lavoro non esiste più.") +
+        '<button class="btn btn-block" data-action="back-task">Torna ai lavori</button>';
+    }
+    var done = t.status === "fatto";
+    var detail =
+      '<div class="card detail-card">' +
+        '<div class="detail-top">' +
+          '<h1 class="detail-title' + (done ? " is-done" : "") + '">' + h(t.title) + "</h1>" +
+          '<div class="task-actions">' +
+            iconBtn("edit-task", t.id, "pencil", "Modifica lavoro") +
+            iconBtn("del-task", t.id, "trash", "Elimina lavoro", true) +
+          "</div>" +
+        "</div>" +
+        '<button class="task-loc detail-loc" data-action="open-room" data-id="' + t.roomId + '">' +
+          svg("pin", "ico-sm") + h(roomName(t.roomId)) + '<span class="sep">•</span>' + h(roomFloorName(t.roomId)) +
+        "</button>" +
+        '<div class="task-badges">' + (done ? "" : prioBadge(t.priority)) + statusBadge(t.status) + "</div>" +
+        (t.description ? '<p class="detail-desc">' + h(t.description) + "</p>" : "") +
+      "</div>";
+
+    return detail +
+      '<section class="section">' +
+        checklistBlock(t.checklist || []) +
+      "</section>" +
+      '<section class="section">' +
+        shoppingLinkedBlock("task", t.id) +
+      "</section>";
+  }
+
+  function checklistBlock(items, title, emptyText) {
+    title = title || "Checklist";
+    emptyText = emptyText || "Nessuna voce. Aggiungi i passi o le cose da comprare per questo lavoro.";
+    var doneN = items.filter(function (c) { return c.done; }).length;
+    var pct = items.length ? Math.round((doneN / items.length) * 100) : 0;
+    var rows = items.length
+      ? '<div class="check-list">' + items.map(function (c) {
+          return '<div class="check-row">' +
+            '<button class="check-box' + (c.done ? " is-done" : "") + '" data-action="toggle-check" data-id="' + c.id + '" aria-label="' + (c.done ? "Annulla spunta" : "Spunta") + '">' + svg("check", "ico-sm") + "</button>" +
+            '<span class="check-text' + (c.done ? " is-done" : "") + '">' + h(c.text) + "</span>" +
+            iconBtn("del-check", c.id, "trash", "Elimina voce", true) +
+          "</div>";
+        }).join("") + "</div>"
+      : '<p class="check-empty">' + h(emptyText) + "</p>";
+
+    return '<div class="section-head"><h2>' + h(title) + "</h2>" +
+      (items.length ? '<span class="check-count mono">' + doneN + "/" + items.length + "</span>" : "") + "</div>" +
+      (items.length ? '<div class="progress"><div class="progress-bar" style="width:' + pct + '%"></div></div>' : "") +
+      rows +
+      '<form class="check-add" data-action="add-check">' +
+        '<input class="input" type="text" name="text" placeholder="Aggiungi voce..." maxlength="120" autocomplete="off" />' +
+        '<button class="setup-inline-add" type="submit" aria-label="Aggiungi voce">' + svg("plus") + "</button>" +
+      "</form>";
+  }
+
+  // ---------- DETTAGLIO IDEA ----------
+  function viewIdeaDetail(ideaId) {
+    state.currentIdeaId = ideaId;
+    var i = findIdea(ideaId);
+    if (!i) {
+      return emptyState("alert", "Idea non trovata", "Questa idea non esiste più.") +
+        '<button class="btn btn-block" data-action="back-idea">Torna alle idee</button>';
+    }
+    var detail =
+      '<div class="card detail-card">' +
+        '<div class="detail-top">' +
+          '<h1 class="detail-title">' + h(i.title) + "</h1>" +
+          '<div class="task-actions">' +
+            iconBtn("edit-idea", i.id, "pencil", "Modifica idea") +
+            iconBtn("del-idea", i.id, "trash", "Elimina idea", true) +
+          "</div>" +
+        "</div>" +
+        '<button class="task-loc detail-loc" data-action="open-room" data-id="' + i.roomId + '">' +
+          svg("pin", "ico-sm") + h(roomName(i.roomId)) + '<span class="sep">•</span>' + h(roomFloorName(i.roomId)) +
+        "</button>" +
+        '<div class="task-badges">' + ideaBadge(i.status) +
+          (i.cost ? '<span class="badge badge-soft idea-cost">' + svg("coin", "ico-sm") + h(i.cost) + "</span>" : "") +
+        "</div>" +
+        (i.link && isSafeUrl(i.link)
+          ? '<a class="idea-link" href="' + h(i.link) + '" target="_blank" rel="noopener noreferrer">' + svg("extlink", "ico-sm") + '<span>' + h(i.link) + "</span></a>"
+          : "") +
+        (i.description ? '<p class="detail-desc">' + h(i.description) + "</p>" : "") +
+      "</div>";
+
+    return detail +
+      '<section class="section">' +
+        checklistBlock(i.checklist || [], "Punti da valutare", "Aggiungi le cose da decidere o verificare per questa idea.") +
+      "</section>" +
+      '<section class="section">' +
+        shoppingLinkedBlock("idea", i.id) +
+      "</section>";
+  }
+
+  // Riquadro "Spesa collegata" riutilizzabile (lavoro/idea)
+  function shoppingLinkedBlock(type, id) {
+    var items = shoppingLinkedTo(type, id);
+    var list = items.length
+      ? '<div class="stack">' + items.map(shopRow).join("") + "</div>"
+      : '<p class="check-empty">Nessun articolo collegato. Aggiungi qui ciò che serve: finirà anche nella Lista spesa.</p>';
+    return '<div class="section-head"><h2>Spesa collegata</h2>' +
+        (items.length ? '<span class="check-count mono">' + items.filter(function (s) { return !s.done; }).length + " da prendere</span>" : "") + "</div>" +
+      list +
+      '<form class="check-add shop-link-add" data-action="add-shop" style="margin-top:10px">' +
+        '<input type="hidden" name="link" value="' + type + ":" + id + '" />' +
+        '<input class="input" type="text" name="text" placeholder="Aggiungi articolo..." maxlength="80" autocomplete="off" />' +
+        '<input class="input shop-qty" type="text" name="qty" placeholder="Q.tà" maxlength="20" autocomplete="off" />' +
+        '<button class="setup-inline-add" type="submit" aria-label="Aggiungi articolo">' + svg("plus") + "</button>" +
+      "</form>";
+  }
+
+  // ---------- LISTA SPESA ----------
+  function viewSpesa() {
+    var all = state.data.shopping.slice();
+    var todo = all.filter(function (s) { return !s.done; }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+    var bought = all.filter(function (s) { return s.done; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+
+    var addForm =
+      '<form class="shop-add" data-action="add-shop">' +
+        '<input class="input" type="text" name="text" placeholder="Cosa serve?" maxlength="80" autocomplete="off" />' +
+        '<div class="shop-add-row">' +
+          '<input class="input shop-qty" type="text" name="qty" placeholder="Q.tà" maxlength="20" autocomplete="off" />' +
+          '<select class="select" name="link" aria-label="Collega a">' + linkOptionsHtml() + "</select>" +
+          '<button class="setup-inline-add" type="submit" aria-label="Aggiungi alla lista">' + svg("plus") + "</button>" +
+        "</div>" +
+      "</form>";
+
+    var body;
+    if (all.length === 0) {
+      body = emptyState("cart", "Lista vuota", "Aggiungi gli articoli che ti servono con il campo qui sopra.");
+    } else {
+      body =
+        (todo.length ? '<div class="stack">' + todo.map(shopRow).join("") + "</div>"
+                     : '<p class="check-empty">Tutto preso. Bel lavoro!</p>') +
+        (bought.length
+          ? '<div class="section-head" style="margin-top:20px"><h2>Presi</h2>' +
+              '<button class="btn btn-sm btn-ghost" data-action="clear-bought">Svuota presi</button></div>' +
+            '<div class="stack">' + bought.map(shopRow).join("") + "</div>"
+          : "");
+    }
+
+    return '<div class="shop-addwrap">' + addForm + "</div>" + body;
+  }
+
+  function shopRow(s) {
+    return '<div class="shop-row' + (s.done ? " is-done" : "") + '">' +
+      '<button class="check-box' + (s.done ? " is-done" : "") + '" data-action="toggle-shop" data-id="' + s.id + '" aria-label="' + (s.done ? "Annulla" : "Segna come preso") + '">' + svg("check", "ico-sm") + "</button>" +
+      '<span class="shop-main">' +
+        '<span class="shop-text' + (s.done ? " is-done" : "") + '">' + h(s.text) + "</span>" +
+        shopLinkTag(s) +
+      "</span>" +
+      (s.qty ? '<span class="shop-qty-badge mono">' + h(s.qty) + "</span>" : "") +
+      iconBtn("del-shop", s.id, "trash", "Elimina articolo", true) +
+    "</div>";
+  }
+
+  function shopLinkTag(s) {
+    if (!s.linkType || !s.linkId) return "";
+    var name = "", icon = "";
+    if (s.linkType === "room") { var r = findRoom(s.linkId); if (!r) return ""; name = r.name; icon = "door"; }
+    else if (s.linkType === "task") { var t = findTask(s.linkId); if (!t) return ""; name = t.title; icon = "listcheck"; }
+    else if (s.linkType === "idea") { var i = findIdea(s.linkId); if (!i) return ""; name = i.title; icon = "bulb"; }
+    else return "";
+    return '<span class="shop-room">' + svg(icon, "ico-sm") + "<span>" + h(name) + "</span></span>";
+  }
+
+  function linkOptionsHtml(selType, selId) {
+    function group(label, arr, type, nameFn) {
+      if (!arr.length) return "";
+      return '<optgroup label="' + label + '">' + arr.map(function (o) {
+        var sel = (type === selType && o.id === selId) ? " selected" : "";
+        return '<option value="' + type + ":" + o.id + '"' + sel + ">" + h(nameFn(o)) + "</option>";
+      }).join("") + "</optgroup>";
+    }
+    return '<option value="">Senza collegamento</option>' +
+      group("Stanze", rooms(), "room", function (r) { return r.name; }) +
+      group("Lavori", state.data.tasks, "task", function (t) { return t.title; }) +
+      group("Idee", state.data.ideas, "idea", function (i) { return i.title; });
+  }
+
+  // ---------- OPZIONI ----------
+  function viewOpzioni() {
+    var s = state.data.settings;
+    var d = state.data;
+
+    var accentSwatches = CONFIG.ACCENTS.map(function (c) {
+      return '<button class="color-opt' + (sameHex(c, s.accentColor) ? " is-active" : "") +
+        '" data-action="set-accent" data-color="' + c + '" style="background:' + c + '" aria-label="Accento ' + c + '"></button>';
+    }).join("");
+
+    var diag =
+      '<div class="diag">' +
+        diagRow("Versione app", d.version) +
+        diagRow("Piani / aree", String(d.house.floors.length)) +
+        diagRow("Stanze", String(d.house.rooms.length)) +
+        diagRow("Lavori", String(d.tasks.length)) +
+        diagRow("Idee", String(d.ideas.length)) +
+        diagRow("Voci spesa", String(d.shopping.length)) +
+        diagRow("Chiave storage", CONFIG.STORAGE_KEY) +
+        diagRow("Ultimo agg.", formatDateTime(d.updatedAt)) +
+      "</div>";
+
+    return '' +
+      '<div class="opt-group">' +
+        '<div class="opt-group-title">Dati</div>' +
+        optRow("export-json", "download", "Esporta JSON", "Scarica un backup dei dati") +
+        optRow("import-json", "upload", "Importa JSON", "Ripristina da un file di backup") +
+      "</div>" +
+
+      '<div class="opt-group">' +
+        '<div class="opt-group-title">Aspetto</div>' +
+        '<button class="opt-row" data-action="toggle-theme">' +
+          '<span class="opt-ico">' + svg(s.theme === "light" ? "sun" : "moon") + "</span>" +
+          '<span class="opt-main"><span class="opt-label">Tema ' + (s.theme === "light" ? "chiaro" : "scuro") + "</span>" +
+          '<span class="opt-sub">Tocca per cambiare</span></span>' +
+          '<span class="switch ' + (s.theme === "light" ? "" : "is-on") + '"></span>' +
+        "</button>" +
+        '<div class="accent-row">' +
+          '<div class="accent-label">Colore accento</div>' +
+          '<div class="color-picker">' + accentSwatches + "</div>" +
+        "</div>" +
+      "</div>" +
+
+      '<div class="opt-group">' +
+        '<div class="opt-group-title">Gestione casa</div>' +
+        optRow("manage-floors", "layers", "Gestione piani / aree", d.house.floors.length + " piani · " + d.house.rooms.length + " stanze") +
+      "</div>" +
+
+      '<div class="opt-group">' +
+        '<div class="opt-group-title">Diagnostica</div>' +
+      "</div>" + diag +
+
+      '<div class="opt-group" style="margin-top:16px">' +
+        '<div class="opt-group-title">Zona pericolosa</div>' +
+        '<button class="opt-row is-danger" data-action="reset-data">' +
+          '<span class="opt-ico is-danger">' + svg("trash") + "</span>" +
+          '<span class="opt-main"><span class="opt-label">Reset dati</span>' +
+          '<span class="opt-sub">Elimina tutto e torna alla configurazione</span></span>' +
+        "</button>" +
+      "</div>";
+  }
+
+  function optRow(action, icon, label, sub) {
+    return '<button class="opt-row" data-action="' + action + '">' +
+      '<span class="opt-ico">' + svg(icon) + "</span>" +
+      '<span class="opt-main"><span class="opt-label">' + label + "</span>" +
+      '<span class="opt-sub">' + sub + "</span></span>" +
+      '<span class="opt-trail">' + svg("chevron") + "</span></button>";
+  }
+  function diagRow(k, v) {
+    return '<div class="diag-row"><span class="dg-key">' + k + '</span><span class="dg-val">' + h(v) + "</span></div>";
+  }
+
+  /* ==========================================================
+     MODALS
+     ========================================================== */
+  function openModal(inner) {
+    elModal.innerHTML =
+      '<div class="modal-overlay" data-action="modal-close"></div>' +
+      '<div class="modal" role="dialog" aria-modal="true">' +
+        '<div class="modal-grabber"></div>' + inner + "</div>";
+    elModal.classList.add("is-open");
+  }
+  function closeModal() {
+    elModal.classList.remove("is-open");
+    elModal.innerHTML = "";
+    pendingConfirm = null;
+    pendingCancel = null;
+  }
+  function modalHead(title, closeAction) {
+    return '<div class="modal-head"><h2>' + title + "</h2>" +
+      '<button class="icon-btn" data-action="' + (closeAction || "modal-close") + '" aria-label="Chiudi">' + svg("x") + "</button></div>";
+  }
+
+  // --- LAVORO ---
+  function openTaskModal(task, presetRoomId) {
+    if (rooms().length === 0) { toast("Crea prima una stanza", "error"); return; }
+    var isEdit = !!task;
+    var rid = task ? task.roomId : (presetRoomId || rooms()[0].id);
+    var inner =
+      modalHead(isEdit ? "Modifica lavoro" : "Nuovo lavoro") +
+      '<form class="modal-body" data-action="save-task" data-id="' + (task ? task.id : "") + '">' +
+        field("Titolo", '<input class="input" type="text" name="title" maxlength="80" autocomplete="off" placeholder="Es. Riparare rubinetto" value="' + h(task ? task.title : "") + '" />') +
+        field("Stanza", select("roomId", roomOptions(rid))) +
+        '<div class="field-row">' +
+          field("Priorità", select("priority", optionsFrom(PRIO_LABEL, task ? task.priority : "media"))) +
+          field("Stato", select("status", optionsFrom(STATUS_LABEL, task ? task.status : "da_fare"))) +
+        "</div>" +
+        field("Descrizione", '<textarea class="textarea" name="description" maxlength="600" placeholder="Dettagli (facoltativo)">' + h(task ? task.description : "") + "</textarea>") +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" type="button" data-action="modal-close">Annulla</button>' +
+          '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
+        "</div>" +
+      "</form>";
+    openModal(inner);
+  }
+
+  // --- IDEA ---
+  function openIdeaModal(idea, presetRoomId) {
+    if (rooms().length === 0) { toast("Crea prima una stanza", "error"); return; }
+    var isEdit = !!idea;
+    var rid = idea ? idea.roomId : (presetRoomId || rooms()[0].id);
+    var inner =
+      modalHead(isEdit ? "Modifica idea" : "Nuova idea") +
+      '<form class="modal-body" data-action="save-idea" data-id="' + (idea ? idea.id : "") + '">' +
+        field("Titolo", '<input class="input" type="text" name="title" maxlength="80" autocomplete="off" placeholder="Es. Parete attrezzata" value="' + h(idea ? idea.title : "") + '" />') +
+        field("Stanza", select("roomId", roomOptions(rid))) +
+        '<div class="field-row">' +
+          field("Stato", select("status", optionsFrom(IDEA_LABEL, idea ? idea.status : "bozza"))) +
+          field("Stima costo", '<input class="input" type="text" name="cost" inputmode="decimal" maxlength="20" autocomplete="off" placeholder="Es. 1200 €" value="' + h(idea ? idea.cost : "") + '" />') +
+        "</div>" +
+        field("Link di riferimento", '<input class="input" type="url" name="link" maxlength="300" autocomplete="off" inputmode="url" placeholder="https://… (facoltativo)" value="' + h(idea ? idea.link : "") + '" />') +
+        field("Descrizione", '<textarea class="textarea" name="description" maxlength="600" placeholder="Descrivi l\'idea (facoltativo)">' + h(idea ? idea.description : "") + "</textarea>") +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" type="button" data-action="modal-close">Annulla</button>' +
+          '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
+        "</div>" +
+      "</form>";
+    openModal(inner);
+  }
+
+  // --- GESTIONE PIANI ---
+  function openManageFloors() {
+    state.manageFloorId = null;
+    var fl = floors();
+    var list = fl.length
+      ? '<div class="stack">' + fl.map(function (f) {
+          return '<div class="manage-item">' +
+            '<button class="mi-tap" data-action="manage-floor-rooms" data-id="' + f.id + '" aria-label="Gestisci ' + h(f.name) + '">' +
+              '<span class="mi-swatch" style="background:var(--accent)">' + svg("layers", "ico-sm") + "</span>" +
+              '<span class="mi-main"><span class="mi-name">' + h(f.name) + "</span>" +
+              '<span class="mi-sub">' + roomsOf(f.id).length + " stanze</span></span>" +
+              '<span class="mi-chevron">' + svg("chevron") + "</span>" +
+            "</button>" +
+          "</div>";
+        }).join("") + "</div>"
+      : emptyState("layers", "Nessun piano/area", "Aggiungine uno qui sotto.");
+    var inner =
+      modalHead("Piani / Aree") +
+      '<div class="modal-body">' + list +
+        '<button class="btn btn-primary btn-block" style="margin-top:14px" data-action="add-floor-form">' + svg("plus") + "Aggiungi piano/area</button>" +
+      "</div>";
+    openModal(inner);
+  }
+
+  // Drill-down: stanze di un singolo piano + gestione del piano stesso
+  function openManageRoomsOfFloor(floorId) {
+    state.manageFloorId = floorId;
+    var f = findFloor(floorId);
+    if (!f) { openManageFloors(); return; }
+    var rs = roomsOf(floorId);
+    var list = rs.length
+      ? '<div class="stack">' + rs.map(function (r) {
+          return '<div class="manage-item">' +
+            '<span class="mi-swatch" style="background:' + h(r.color) + '">' + svg(roomIcon(r.icon), "ico-sm") + "</span>" +
+            '<span class="mi-main"><span class="mi-name">' + h(r.name) + "</span></span>" +
+            '<span class="mi-actions">' +
+              iconBtn("edit-room-form", r.id, "pencil", "Modifica stanza") +
+              iconBtn("del-room", r.id, "trash", "Elimina stanza", true) +
+            "</span></div>";
+        }).join("") + "</div>"
+      : emptyState("door", "Nessuna stanza", "Aggiungi la prima stanza di questo piano.");
+    var inner =
+      '<div class="modal-head">' +
+        '<button class="icon-btn" data-action="manage-floors" aria-label="Torna ai piani">' + svg("back") + "</button>" +
+        '<h2 class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + h(f.name) + "</h2>" +
+      "</div>" +
+      '<div class="modal-body">' +
+        '<div class="row" style="gap:10px;margin-bottom:14px">' +
+          '<button class="btn btn-sm btn-ghost grow" data-action="edit-floor-form" data-id="' + f.id + '">' + svg("pencil") + "Rinomina</button>" +
+          '<button class="btn btn-sm btn-danger grow" data-action="del-floor" data-id="' + f.id + '">' + svg("trash") + "Elimina piano</button>" +
+        "</div>" +
+        '<div class="opt-group-title" style="padding:0 0 8px">Stanze</div>' +
+        list +
+        '<button class="btn btn-primary btn-block" style="margin-top:14px" data-action="add-room-to-floor" data-floor="' + f.id + '">' + svg("plus") + "Aggiungi stanza</button>" +
+      "</div>";
+    openModal(inner);
+  }
+
+  // Ritorno dopo il form piano: alla lista piani (nuovo) o al piano in gestione (rinomina)
+  function backFromFloorForm() {
+    if (state.manageFloorId) openManageRoomsOfFloor(state.manageFloorId);
+    else openManageFloors();
+  }
+
+  function openFloorModal(floor) {
+    var isEdit = !!floor;
+    var inner =
+      modalHead(isEdit ? "Modifica piano/area" : "Nuovo piano/area", "back-floor-form") +
+      '<form class="modal-body" data-action="save-floor" data-id="' + (floor ? floor.id : "") + '">' +
+        field("Nome", '<input class="input" type="text" name="name" maxlength="40" autocomplete="off" placeholder="Es. Primo Piano" value="' + h(floor ? floor.name : "") + '" />') +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" type="button" data-action="back-floor-form">Annulla</button>' +
+          '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
+        "</div>" +
+      "</form>";
+    openModal(inner);
+  }
+
+  function openRoomModal(room, presetFloorId) {
+    var isEdit = !!room;
+    var fl = floors();
+    var curFloor = room ? room.floorId : (presetFloorId || fl[0].id);
+    var curIcon = room ? roomIcon(room.icon) : "living";
+    var curColor = room ? room.color : CONFIG.ROOM_COLORS[0];
+
+    var iconPicker = '<div class="icon-picker">' + ROOM_ICON_KEYS.map(function (k) {
+      return '<button type="button" class="icon-opt' + (k === curIcon ? " is-active" : "") +
+        '" data-action="pick-icon" data-icon="' + k + '" aria-label="Icona ' + k + '">' + svg(k) + "</button>";
+    }).join("") + "</div>";
+
+    var colorPicker = '<div class="color-picker">' + CONFIG.ROOM_COLORS.map(function (c) {
+      return '<button type="button" class="color-opt' + (sameHex(c, curColor) ? " is-active" : "") +
+        '" data-action="pick-color" data-color="' + c + '" style="background:' + c + '" aria-label="Colore ' + c + '"></button>';
+    }).join("") + "</div>";
+
+    var inner =
+      modalHead(isEdit ? "Modifica stanza" : "Nuova stanza", "back-rooms") +
+      '<form class="modal-body" data-action="save-room" data-id="' + (room ? room.id : "") + '">' +
+        field("Nome", '<input class="input" type="text" name="name" maxlength="40" autocomplete="off" placeholder="Es. Cucina" value="' + h(room ? room.name : "") + '" />') +
+        field("Piano / area", select("floorId", floorOptions(curFloor))) +
+        '<input type="hidden" name="icon" value="' + curIcon + '" />' +
+        field("Icona", iconPicker) +
+        '<input type="hidden" name="color" value="' + curColor + '" />' +
+        field("Colore", colorPicker) +
+        field("Note", '<textarea class="textarea" name="notes" maxlength="400" placeholder="Note sulla stanza (facoltativo)">' + h(room ? room.notes : "") + "</textarea>") +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" type="button" data-action="back-rooms">Annulla</button>' +
+          '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
+        "</div>" +
+      "</form>";
+    openModal(inner);
+  }
+
+  // --- CONFERMA ---
+  function openConfirm(opts) {
+    pendingConfirm = opts.onConfirm || null;
+    pendingCancel = opts.onCancel || null;
+    var inner =
+      modalHead(opts.title || "Conferma", "confirm-no") +
+      '<div class="modal-body">' +
+        '<p class="confirm-text">' + opts.message + "</p>" +
+        (opts.warn ? '<div class="confirm-warn">' + svgRaw("alert", "ico-sm") + " " + opts.warn + "</div>" : "") +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" data-action="confirm-no">Annulla</button>' +
+          '<button class="btn btn-danger" data-action="confirm-yes">' + (opts.confirmLabel || "Elimina") + "</button>" +
+        "</div>" +
+      "</div>";
+    openModal(inner);
+  }
+
+  /* ==========================================================
+     ACTIONS (event delegation: un solo gestore)
+     ========================================================== */
+  function handleAction(action, node, event) {
+    var id = node.getAttribute ? node.getAttribute("data-id") : null;
+
+    switch (action) {
+      /* --- navigazione --- */
+      case "go": navigate("#" + node.getAttribute("data-route")); break;
+      case "open-room": navigate("#stanza/" + id); break;
+      case "open-task": navigate("#lavoro/" + id); break;
+      case "open-idea": navigate("#idea/" + id); break;
+      case "back-home": navigate("#home"); break;
+      case "back-task": if (window.history.length > 1) window.history.back(); else navigate("#lavori"); break;
+      case "back-idea": if (window.history.length > 1) window.history.back(); else navigate("#idee"); break;
+
+      /* --- setup (CONFIGURA CASA) --- */
+      case "setup-add-floor": {
+        var fn = val(node, "floorName");
+        if (!fn) { toast("Inserisci un nome", "error"); return; }
+        state.data.house.floors.push(createFloor(fn));
+        persist(); toast("Piano creato", "success"); renderSetup();
+        break;
+      }
+      case "setup-del-floor": deleteFloor(id); renderSetup(); break;
+      case "setup-add-room": {
+        var rn = val(node, "roomName");
+        var fid = val(node, "floorId");
+        if (!rn) { toast("Inserisci un nome", "error"); return; }
+        if (!fid) { toast("Seleziona un piano", "error"); return; }
+        state.data.house.rooms.push(createRoom(rn, fid));
+        persist(); toast("Stanza creata", "success"); renderSetup();
+        break;
+      }
+      case "setup-del-room": deleteRoom(id); renderSetup(); break;
+      case "setup-enter":
+        if (node.getAttribute("aria-disabled") === "true") return;
+        if (needsSetup()) { toast("Crea almeno un piano e una stanza", "error"); return; }
+        navigate("#home");
+        break;
+
+      /* --- lavori --- */
+      case "filter-prio": state.filterPrio = node.getAttribute("data-prio"); render(); break;
+      case "add-task": openTaskModal(null, null); break;
+      case "add-task-room": openTaskModal(null, node.getAttribute("data-room")); break;
+      case "edit-task": openTaskModal(findTask(id), null); break;
+      case "del-task": {
+        var t = findTask(id);
+        openConfirm({
+          title: "Elimina lavoro",
+          message: "Vuoi eliminare il lavoro <strong>" + h(t.title) + "</strong>?",
+          onConfirm: function () {
+            unlinkShopping("task", id);
+            state.data.tasks = state.data.tasks.filter(function (x) { return x.id !== id; });
+            persist(); closeModal(); toast("Dati eliminati", "success");
+            if (parseHash().name === "lavoro") navigate("#lavori"); else render();
+          }
+        });
+        break;
+      }
+      case "save-task": saveTask(node); break;
+
+      /* --- checklist del lavoro (pagina dettaglio) --- */
+      case "add-check": {
+        var ctext = val(node, "text");
+        if (!ctext) return;
+        var cowner = currentChecklistOwner();
+        if (!cowner) return;
+        if (!Array.isArray(cowner.checklist)) cowner.checklist = [];
+        cowner.checklist.push(createCheckItem(ctext));
+        cowner.updatedAt = nowISO();
+        persist(); render();
+        break;
+      }
+      case "toggle-check": {
+        var towner = currentChecklistOwner();
+        if (!towner) break;
+        var citem = (towner.checklist || []).filter(function (c) { return c.id === id; })[0];
+        if (citem) { citem.done = !citem.done; towner.updatedAt = nowISO(); persist(); render(); }
+        break;
+      }
+      case "del-check": {
+        var downer = currentChecklistOwner();
+        if (!downer) break;
+        downer.checklist = (downer.checklist || []).filter(function (c) { return c.id !== id; });
+        downer.updatedAt = nowISO();
+        persist(); render();
+        break;
+      }
+
+      /* --- lista spesa --- */
+      case "add-shop": {
+        var stext = val(node, "text");
+        if (!stext) { toast("Scrivi cosa serve", "error"); return; }
+        var linkRaw = val(node, "link");
+        var linkType = "", linkId = null;
+        if (linkRaw) { var pp = linkRaw.split(":"); linkType = pp[0]; linkId = pp.slice(1).join(":") || null; }
+        state.data.shopping.push(createShopItem({ text: stext, qty: val(node, "qty"), linkType: linkType, linkId: linkId }));
+        persist(); render();
+        break;
+      }
+      case "toggle-shop": { var sh = findShop(id); if (sh) { sh.done = !sh.done; persist(); render(); } break; }
+      case "del-shop": {
+        state.data.shopping = state.data.shopping.filter(function (x) { return x.id !== id; });
+        persist(); render();
+        break;
+      }
+      case "clear-bought": {
+        state.data.shopping = state.data.shopping.filter(function (x) { return !x.done; });
+        persist(); toast("Presi rimossi", "success"); render();
+        break;
+      }
+
+      /* --- idee --- */
+      case "add-idea": openIdeaModal(null, null); break;
+      case "add-idea-room": openIdeaModal(null, node.getAttribute("data-room")); break;
+      case "edit-idea": openIdeaModal(findIdea(id), null); break;
+      case "del-idea": {
+        var ii = findIdea(id);
+        openConfirm({
+          title: "Elimina idea",
+          message: "Vuoi eliminare l'idea <strong>" + h(ii.title) + "</strong>?",
+          onConfirm: function () {
+            unlinkShopping("idea", id);
+            state.data.ideas = state.data.ideas.filter(function (x) { return x.id !== id; });
+            persist(); closeModal(); toast("Dati eliminati", "success");
+            if (parseHash().name === "idea") navigate("#idee"); else render();
+          }
+        });
+        break;
+      }
+      case "save-idea": saveIdea(node); break;
+
+      /* --- opzioni: aspetto --- */
+      case "toggle-theme":
+        state.data.settings.theme = state.data.settings.theme === "light" ? "dark" : "light";
+        persist(); render();
+        break;
+      case "set-accent":
+        state.data.settings.accentColor = node.getAttribute("data-color");
+        persist(); render();
+        break;
+
+      /* --- opzioni: dati --- */
+      case "export-json": exportJSON(); break;
+      case "import-json": importJSON(); break;
+      case "reset-data":
+        openConfirm({
+          title: "Reset dati",
+          message: "Verranno eliminati <strong>tutti</strong> i dati: piani, stanze, lavori e idee.",
+          warn: "L'app tornerà alla schermata di configurazione. Operazione non annullabile.",
+          confirmLabel: "Elimina tutto",
+          onConfirm: function () {
+            state.data = createDefaultData();
+            persist(); closeModal(); toast("Dati eliminati", "success");
+            location.hash = ""; render();
+          }
+        });
+        break;
+
+      /* --- gestione piani e stanze (drill-down) --- */
+      case "manage-floors": openManageFloors(); break;
+      case "manage-floor-rooms": openManageRoomsOfFloor(id); break;
+      case "add-floor-form": openFloorModal(null); break;
+      case "edit-floor-form": openFloorModal(findFloor(id)); break;
+      case "save-floor": saveFloor(node); break;
+      case "back-floor-form": backFromFloorForm(); break;
+      case "del-floor": {
+        var f = findFloor(id);
+        var nR = roomsOf(id).length;
+        openConfirm({
+          title: "Elimina piano/area",
+          message: "Vuoi eliminare <strong>" + h(f.name) + "</strong>?",
+          warn: nR > 0 ? ("Verranno eliminate anche " + nR + " stanze e tutti i lavori/idee collegati.") : "",
+          onConfirm: function () { deleteFloor(id); toast("Dati eliminati", "success"); state.manageFloorId = null; render(); openManageFloors(); },
+          onCancel: function () { openManageRoomsOfFloor(state.manageFloorId); }
+        });
+        break;
+      }
+      case "add-room-to-floor": openRoomModal(null, node.getAttribute("data-floor")); break;
+      case "edit-room-form": openRoomModal(findRoom(id)); break;
+      case "save-room": saveRoom(node); break;
+      case "back-rooms": openManageRoomsOfFloor(state.manageFloorId); break;
+      case "del-room": {
+        var r = findRoom(id);
+        var nT = tasksOf(id).length, nI = ideasOf(id).length;
+        openConfirm({
+          title: "Elimina stanza",
+          message: "Vuoi eliminare <strong>" + h(r.name) + "</strong>?",
+          warn: (nT + nI) > 0 ? ("Verranno eliminati anche " + nT + " lavori e " + nI + " idee collegati.") : "",
+          onConfirm: function () { deleteRoom(id); toast("Dati eliminati", "success"); render(); openManageRoomsOfFloor(state.manageFloorId); },
+          onCancel: function () { openManageRoomsOfFloor(state.manageFloorId); }
+        });
+        break;
+      }
+
+      /* --- pickers dentro modale stanza --- */
+      case "pick-icon": pickInGroup(node, "icon-opt", "icon"); break;
+      case "pick-color": pickInGroup(node, "color-opt", "color"); break;
+
+      /* --- modale/conferma generici --- */
+      case "modal-close": closeModal(); break;
+      case "confirm-yes": { var fn2 = pendingConfirm; pendingConfirm = null; if (fn2) fn2(); break; }
+      case "confirm-no": { var fc = pendingCancel; pendingCancel = null; pendingConfirm = null; if (fc) fc(); else closeModal(); break; }
+    }
+  }
+
+  // --- salvataggi form ---
+  function saveTask(form) {
+    var title = val(form, "title");
+    if (!title) { toast("Inserisci un titolo", "error"); return; }
+    var roomId = val(form, "roomId");
+    var priority = val(form, "priority") || "media";
+    var status = val(form, "status") || "da_fare";
+    var description = val(form, "description");
+    var id = form.getAttribute("data-id");
+    if (id) {
+      var t = findTask(id);
+      var wasDone = t.status === "fatto";
+      t.title = title; t.roomId = roomId; t.priority = priority; t.status = status;
+      t.description = description; t.updatedAt = nowISO();
+      if (status === "fatto" && !wasDone) t.completedAt = nowISO();
+      if (status !== "fatto") t.completedAt = null;
+    } else {
+      state.data.tasks.push(createTask({ title: title, roomId: roomId, priority: priority, status: status, description: description }));
+    }
+    persist(); closeModal(); toast("Lavoro salvato", "success"); render();
+  }
+
+  function saveIdea(form) {
+    var title = val(form, "title");
+    if (!title) { toast("Inserisci un titolo", "error"); return; }
+    var roomId = val(form, "roomId");
+    var status = val(form, "status") || "bozza";
+    var description = val(form, "description");
+    var cost = val(form, "cost");
+    var link = normalizeUrl(val(form, "link"));
+    var id = form.getAttribute("data-id");
+    if (id) {
+      var i = findIdea(id);
+      i.title = title; i.roomId = roomId; i.status = status; i.description = description;
+      i.cost = cost; i.link = link; i.updatedAt = nowISO();
+    } else {
+      state.data.ideas.push(createIdea({ title: title, roomId: roomId, status: status, description: description, cost: cost, link: link }));
+    }
+    persist(); closeModal(); toast("Idea salvata", "success"); render();
+  }
+
+  function saveFloor(form) {
+    var name = val(form, "name");
+    if (!name) { toast("Inserisci un nome", "error"); return; }
+    var id = form.getAttribute("data-id");
+    if (id) { var f = findFloor(id); f.name = name; toast("Piano salvato", "success"); }
+    else { state.data.house.floors.push(createFloor(name)); toast("Piano creato", "success"); }
+    persist(); render(); backFromFloorForm();
+  }
+
+  function saveRoom(form) {
+    var name = val(form, "name");
+    if (!name) { toast("Inserisci un nome", "error"); return; }
+    var floorId = val(form, "floorId");
+    var icon = val(form, "icon") || "door";
+    var color = val(form, "color") || CONFIG.DEFAULT_ACCENT;
+    var notes = val(form, "notes");
+    var id = form.getAttribute("data-id");
+    if (id) {
+      var r = findRoom(id);
+      r.name = name; r.floorId = floorId; r.icon = icon; r.color = color; r.notes = notes;
+      toast("Stanza salvata", "success");
+    } else {
+      state.data.house.rooms.push(createRoom(name, floorId, { icon: icon, color: color, notes: notes }));
+      toast("Stanza creata", "success");
+    }
+    persist(); render(); openManageRoomsOfFloor(state.manageFloorId);
+  }
+
+  // Aggiorna selezione icona/colore dentro la modale stanza
+  function pickInGroup(node, optClass, hiddenName) {
+    var group = node.parentNode;
+    var opts = group.querySelectorAll("." + optClass);
+    for (var i = 0; i < opts.length; i++) opts[i].classList.remove("is-active");
+    node.classList.add("is-active");
+    var value = node.getAttribute(hiddenName === "icon" ? "data-icon" : "data-color");
+    var hidden = elModal.querySelector('input[name="' + hiddenName + '"]');
+    if (hidden) hidden.value = value;
+  }
+
+  /* ==========================================================
+     SERVICES
+     ========================================================== */
+  function exportJSON() {
+    try {
+      var json = JSON.stringify(state.data, null, 2);
+      var blob = new Blob([json], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "casa-app-backup-" + dateStamp() + ".json";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+      toast("Dati esportati", "success");
+    } catch (e) {
+      toast("Errore durante l'esportazione", "error");
+    }
+  }
+
+  function importJSON() {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    function cleanup() { if (input.parentNode) input.parentNode.removeChild(input); }
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      if (!file) { cleanup(); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var obj = JSON.parse(String(reader.result));
+          if (!validateImport(obj)) { toast("Errore JSON non valido", "error"); cleanup(); return; }
+          state.data = normalizeData(obj);
+          persist();
+          toast("JSON importato", "success");
+          location.hash = needsSetup() ? "" : "#home";
+          render();
+        } catch (e) {
+          toast("Errore JSON non valido", "error");
+        }
+        cleanup();
+      };
+      reader.onerror = function () { toast("Errore JSON non valido", "error"); cleanup(); };
+      reader.readAsText(file);
+    });
+    document.body.appendChild(input);
+    input.click();
+  }
+
+  function validateImport(obj) {
+    if (!obj || typeof obj !== "object") return false;
+    if (!obj.house || typeof obj.house !== "object") return false;
+    if (!Array.isArray(obj.house.floors) || !Array.isArray(obj.house.rooms)) return false;
+    if (!Array.isArray(obj.tasks) || !Array.isArray(obj.ideas)) return false;
+    return true;
+  }
+
+  var toastTimer = null;
+  function toast(msg, type) {
+    var el = document.createElement("div");
+    el.className = "toast" + (type === "success" ? " is-success" : type === "error" ? " is-error" : "");
+    var icon = type === "success" ? "check" : type === "error" ? "alert" : "info";
+    el.innerHTML = svg(icon, "ico-sm") + "<span>" + h(msg) + "</span>";
+    elToast.innerHTML = "";
+    elToast.appendChild(el);
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.classList.add("is-out");
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+    }, 2200);
+  }
+
+  /* ==========================================================
+     UTILS
+     ========================================================== */
+  function uid(prefix) { return prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function nowISO() { return new Date().toISOString(); }
+
+  function h(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function svg(name, cls) {
+    return '<svg class="ico ' + (cls || "") + '" viewBox="0 0 24 24" aria-hidden="true">' + (ICONS[name] || ICONS.door) + "</svg>";
+  }
+  function svgRaw(name, cls) { return svg(name, cls); }
+
+  function roomIcon(key) { return ICONS[key] ? key : "door"; }
+
+  function field(label, control) {
+    return '<div class="field"><label>' + label + "</label>" + control + "</div>";
+  }
+  function select(name, optionsHtml) {
+    return '<select class="select" name="' + name + '">' + optionsHtml + "</select>";
+  }
+  function optionsFrom(map, current) {
+    var out = "";
+    for (var k in map) {
+      if (map.hasOwnProperty(k)) {
+        out += '<option value="' + k + '"' + (k === current ? " selected" : "") + ">" + map[k] + "</option>";
+      }
+    }
+    return out;
+  }
+  function roomOptions(current) {
+    return rooms().map(function (r) {
+      return '<option value="' + r.id + '"' + (r.id === current ? " selected" : "") + ">" + h(r.name) + " — " + h(floorNameOf(r.floorId)) + "</option>";
+    }).join("");
+  }
+  function floorOptions(current) {
+    return floors().map(function (f) {
+      return '<option value="' + f.id + '"' + (f.id === current ? " selected" : "") + ">" + h(f.name) + "</option>";
+    }).join("");
+  }
+
+  function val(scope, name) {
+    var el = scope.querySelector ? scope.querySelector('[name="' + name + '"]') : null;
+    return el ? String(el.value).trim() : "";
+  }
+
+  function iconBtn(action, id, icon, label, danger) {
+    return '<button class="icon-btn' + (danger ? " is-danger" : "") + '" data-action="' + action + '" data-id="' + id + '" aria-label="' + label + '">' + svg(icon) + "</button>";
+  }
+  function fab(action, label) {
+    return '<button class="fab" data-action="' + action + '" aria-label="' + label + '">' + svg("plus") + "</button>";
+  }
+  function emptyState(icon, title, text) {
+    return '<div class="empty"><div class="empty-ico">' + svg(icon) + "</div><h3>" + h(title) + "</h3><p>" + h(text) + "</p></div>";
+  }
+  function prioBadge(p) { return '<span class="badge badge-prio-' + p + '"><span class="dot"></span>' + PRIO_LABEL[p] + "</span>"; }
+  function statusBadge(s) { return '<span class="badge badge-stato-' + s + '"><span class="dot"></span>' + STATUS_LABEL[s] + "</span>"; }
+  function ideaBadge(s) { return '<span class="badge badge-idea-' + s + '"><span class="dot"></span>' + IDEA_LABEL[s] + "</span>"; }
+  function roomName(id) { var r = findRoom(id); return r ? r.name : "Stanza eliminata"; }
+
+  function normalizeUrl(u) {
+    u = (u || "").trim();
+    if (!u) return "";
+    if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+    return u;
+  }
+  function isSafeUrl(u) { return /^https?:\/\//i.test(u || ""); }
+
+  function isHex(s) { return typeof s === "string" && /^#[0-9a-fA-F]{6}$/.test(s); }
+  function sameHex(a, b) { return isHex(a) && isHex(b) && a.toLowerCase() === b.toLowerCase(); }
+  function hexToRgba(hex, a) {
+    if (!isHex(hex)) hex = CONFIG.DEFAULT_ACCENT;
+    var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return "rgba(" + r + "," + g + "," + b + "," + a + ")";
+  }
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function dateStamp() {
+    var d = new Date();
+    return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+  }
+  function formatDateTime(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  /* ==========================================================
+     BOOT — listener centralizzati + avvio
+     ========================================================== */
+  function onClick(e) {
+    var node = e.target.closest ? e.target.closest("[data-action]") : null;
+    if (!node) return;
+    // Il data-action di un <form> serve SOLO all'evento submit: un click che
+    // risale fino al form (es. aprendo una <select> o toccando un campo) non
+    // deve scatenare l'azione, altrimenti chiuderebbe/salverebbe il popup.
+    if (node.tagName === "FORM") return;
+    // Ignora anche il bottone submit dentro un form (lo gestisce il submit).
+    if (node.tagName === "BUTTON" && node.type === "submit" && node.form) return;
+    e.preventDefault();
+    handleAction(node.getAttribute("data-action"), node, e);
+  }
+  function onSubmit(e) {
+    var form = e.target.closest ? e.target.closest("form[data-action]") : null;
+    if (!form) return;
+    e.preventDefault();
+    handleAction(form.getAttribute("data-action"), form, e);
+  }
+
+  function boot() {
+    elHeader = document.getElementById("app-header");
+    elView = document.getElementById("view");
+    elNav = document.getElementById("bottom-nav");
+    elToast = document.getElementById("toast-host");
+    elModal = document.getElementById("modal-host");
+
+    var loaded = loadData();
+    if (loaded) { state.data = loaded; }
+    else { state.data = createDefaultData(); persist(); }
+
+    document.addEventListener("click", onClick, false);
+    document.addEventListener("submit", onSubmit, false);
+    window.addEventListener("hashchange", render, false);
+
+    render();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
