@@ -1,11 +1,38 @@
 ========================================
  CASA APP — Istruzioni
+ Versione 2.5.0
 ========================================
 
 Casa App è una web app statica (PWA leggera) per gestire lavori di casa,
 stanze, piani/aree e idee progettuali. Funziona sia aprendo index.html in
 locale sia pubblicata su GitHub Pages. I dati restano salvati SOLO sul tuo
-dispositivo (localStorage del browser).
+dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
+
+----------------------------------------
+ FUNZIONALITÀ PRINCIPALI
+----------------------------------------
+
+- HOME: riepilogo (lavori, aperti, alta priorità, completati, idee) e le
+  stanze raggruppate per piano/area.
+- LAVORI: elenco con priorità (alta/media/bassa) e stato
+  (da fare / in corso / in attesa / fatto), filtro per priorità.
+  Scadenza facoltativa con badge "Scaduto / Oggi / Tra N gg"; in Home
+  il numero di lavori "Scaduti".
+- IDEE: elenco con stato (bozza / da valutare / approvata / archiviata),
+  link di riferimento e stima costo.
+- Dettaglio LAVORO/IDEA: titolo completo, CHECKLIST riordinabile
+  (trascina la maniglia), e SPESA collegata.
+- Un lavoro/idea può stare su PIÙ STANZE (oppure su nessuna: "Senza stanza").
+- SPESA: lista della spesa unica, con quantità, categoria "Dove comprare"
+  (ferramenta, arredamento, ...), nota per articolo e collegamento opzionale
+  a una stanza, a un lavoro o a un'idea. Filtro per categoria. Tocca un
+  articolo per modificarlo.
+- OPZIONI: tema chiaro/scuro, colore accento, gestione piani e stanze,
+  diagnostica, esporta/importa JSON, reset dati.
+
+NOTA: la gestione delle STANZE è dentro la gestione dei PIANI/AREE
+(Opzioni -> Gestione piani/aree -> tocca un piano -> aggiungi/gestisci
+le sue stanze).
 
 ----------------------------------------
  1. COME CARICARE I FILE SU GITHUB PAGES
@@ -116,8 +143,18 @@ Al primo avvio l'app è vuota e mostra la schermata "CONFIGURA CASA":
   - Il pulsante "Entra nell'app" si attiva solo quando esiste almeno
     un piano/area E almeno una stanza.
 
-Dopo il primo avvio, piani/aree e stanze si gestiscono da OPZIONI.
+Dopo il primo avvio, piani/aree e stanze si gestiscono da OPZIONI
+(le stanze stanno dentro ciascun piano: Gestione piani/aree -> tocca un piano).
 Dopo un Reset dati l'app torna alla schermata "CONFIGURA CASA".
+
+----------------------------------------
+ 7. DIAGNOSTICA (in OPZIONI)
+----------------------------------------
+
+In OPZIONI trovi un box "Diagnostica" che mostra lo stato dei dati:
+versione app, numero piani/aree, stanze, lavori, idee, voci spesa,
+chiave di salvataggio e data dell'ultimo aggiornamento. Utile per
+controllare al volo cosa c'è salvato sul dispositivo.
 
 ========================================
  Buon lavoro con Casa App!

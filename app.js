@@ -11,11 +11,28 @@
      ========================================================== */
   var CONFIG = {
     STORAGE_KEY: "casa-app-v2-data",
-    VERSION: "2.2.0",
+    VERSION: "2.5.0",
     DEFAULT_ACCENT: "#218bff",
     ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
-    ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"]
+    ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"],
+    // Categorie "Dove comprare" per la lista spesa
+    SHOP_CATEGORIES: [
+      { k: "ferramenta", l: "Ferramenta" },
+      { k: "arredamento", l: "Arredamento" },
+      { k: "supermercato", l: "Supermercato" },
+      { k: "giardinaggio", l: "Giardinaggio" },
+      { k: "elettricita", l: "Elettricità/Illum." },
+      { k: "idraulica", l: "Idraulica" },
+      { k: "colori", l: "Colori/Vernici" },
+      { k: "online", l: "Online" },
+      { k: "altro", l: "Altro" }
+    ]
   };
+  function shopCatLabel(k) {
+    for (var i = 0; i < CONFIG.SHOP_CATEGORIES.length; i++) if (CONFIG.SHOP_CATEGORIES[i].k === k) return CONFIG.SHOP_CATEGORIES[i].l;
+    return "";
+  }
+  function isShopCat(k) { return !!shopCatLabel(k); }
 
   var PRIO_LABEL = { alta: "Alta", media: "Media", bassa: "Bassa" };
   var PRIO_RANK = { alta: 0, media: 1, bassa: 2 };
@@ -53,6 +70,9 @@
     cart: '<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.3 11.4a1 1 0 0 0 1 .8h8.7a1 1 0 0 0 1-.8L21 7H6"/>',
     listcheck: '<path d="M11 6h10"/><path d="M11 12h10"/><path d="M11 18h10"/><path d="M3 6.5 4.2 7.7 6.5 5"/><path d="M3 12.5 4.2 13.7 6.5 11"/><path d="M3 18.5 4.2 19.7 6.5 17"/>',
     extlink: '<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+    grip: '<path d="M8 7h8"/><path d="M8 12h8"/><path d="M8 17h8"/>',
+    calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v3"/><path d="M16 3v3"/>',
+    bag: '<path d="M6 8h12l-.8 11.1a2 2 0 0 1-2 1.9H8.8a2 2 0 0 1-2-1.9L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
     coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.9-2.5 2s1.1 2 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2c-1 0-2-.4-2.5-1.2"/><path d="M12 6.5v11"/>',
     // Icone stanze
     door: '<path d="M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><path d="M13 12h.01"/>',
@@ -77,6 +97,7 @@
   var state = {
     data: null,            // dati applicativi (vedi DATA MODEL)
     filterPrio: "tutti",   // filtro corrente sezione LAVORI
+    shopFilter: "tutte",   // filtro categoria sezione SPESA
     currentTaskId: null,   // lavoro aperto nella pagina dettaglio
     currentIdeaId: null,   // idea aperta nella pagina dettaglio
     manageFloorId: null    // piano in gestione (drill-down stanze in Opzioni)
@@ -143,11 +164,26 @@
       d.house.floors = Array.isArray(obj.house.floors) ? obj.house.floors : [];
       d.house.rooms = Array.isArray(obj.house.rooms) ? obj.house.rooms : [];
     }
+    // Insieme degli id stanza validi (per ripulire riferimenti pendenti)
+    var validRoom = {};
+    d.house.rooms.forEach(function (r) { if (r && r.id) validRoom[r.id] = true; });
+    function migrateRoomIds(x) {
+      // Migrazione: roomId (singolo) -> roomIds (array). Mantiene solo stanze esistenti.
+      var ids = Array.isArray(x.roomIds) ? x.roomIds : (x.roomId ? [x.roomId] : []);
+      var seen = {}, out = [];
+      ids.forEach(function (id) { if (validRoom[id] && !seen[id]) { seen[id] = true; out.push(id); } });
+      return out;
+    }
     d.tasks = (Array.isArray(obj.tasks) ? obj.tasks : []).map(function (t) {
+      t.roomIds = migrateRoomIds(t);
+      delete t.roomId;
+      t.dueDate = typeof t.dueDate === "string" ? t.dueDate : "";
       t.checklist = Array.isArray(t.checklist) ? t.checklist : [];
       return t;
     });
     d.ideas = (Array.isArray(obj.ideas) ? obj.ideas : []).map(function (i) {
+      i.roomIds = migrateRoomIds(i);
+      delete i.roomId;
       i.checklist = Array.isArray(i.checklist) ? i.checklist : [];
       i.link = typeof i.link === "string" ? i.link : "";
       i.cost = typeof i.cost === "string" ? i.cost : (i.cost != null ? String(i.cost) : "");
@@ -160,6 +196,8 @@
       if (!linkId) linkType = "";
       return {
         id: s.id || uid("shop"), text: s.text || "", qty: s.qty || "",
+        category: isShopCat(s.category) ? s.category : "",
+        note: typeof s.note === "string" ? s.note : "",
         linkType: linkType, linkId: linkId,
         done: !!s.done, createdAt: s.createdAt || nowISO()
       };
@@ -187,8 +225,9 @@
   function createTask(d) {
     var iso = nowISO();
     return {
-      id: uid("task"), roomId: d.roomId, title: d.title, description: d.description || "",
+      id: uid("task"), roomIds: Array.isArray(d.roomIds) ? d.roomIds : [], title: d.title, description: d.description || "",
       priority: d.priority || "media", status: d.status || "da_fare",
+      dueDate: d.dueDate || "",
       checklist: [],
       createdAt: iso, updatedAt: iso, completedAt: d.status === "fatto" ? iso : null
     };
@@ -199,6 +238,7 @@
   function createShopItem(d) {
     return {
       id: uid("shop"), text: d.text, qty: d.qty || "",
+      category: d.category || "", note: d.note || "",
       linkType: d.linkType || "", linkId: d.linkId || null,
       done: false, createdAt: nowISO()
     };
@@ -206,7 +246,7 @@
   function createIdea(d) {
     var iso = nowISO();
     return {
-      id: uid("idea"), roomId: d.roomId, title: d.title, description: d.description || "",
+      id: uid("idea"), roomIds: Array.isArray(d.roomIds) ? d.roomIds : [], title: d.title, description: d.description || "",
       status: d.status || "bozza", link: d.link || "", cost: d.cost || "",
       checklist: [], createdAt: iso, updatedAt: iso
     };
@@ -216,8 +256,8 @@
   function floors() { return state.data.house.floors.slice().sort(byOrderName); }
   function rooms() { return state.data.house.rooms.slice().sort(byOrderName); }
   function roomsOf(floorId) { return rooms().filter(function (r) { return r.floorId === floorId; }); }
-  function tasksOf(roomId) { return state.data.tasks.filter(function (t) { return t.roomId === roomId; }); }
-  function ideasOf(roomId) { return state.data.ideas.filter(function (i) { return i.roomId === roomId; }); }
+  function tasksOf(roomId) { return state.data.tasks.filter(function (t) { return (t.roomIds || []).indexOf(roomId) >= 0; }); }
+  function ideasOf(roomId) { return state.data.ideas.filter(function (i) { return (i.roomIds || []).indexOf(roomId) >= 0; }); }
   function openTasksOf(roomId) { return tasksOf(roomId).filter(function (t) { return t.status !== "fatto"; }); }
   function findFloor(id) { return state.data.house.floors.filter(function (f) { return f.id === id; })[0]; }
   function findRoom(id) { return state.data.house.rooms.filter(function (r) { return r.id === id; })[0]; }
@@ -248,14 +288,27 @@
     persist();
   }
   function deleteRoom(id) {
-    // Scollega (senza eliminarli) gli articoli di spesa legati alla stanza
-    // e ai lavori/idee che stanno per essere rimossi con essa.
-    tasksOf(id).forEach(function (t) { unlinkShopping("task", t.id); });
-    ideasOf(id).forEach(function (i) { unlinkShopping("idea", i.id); });
+    // Multi-stanza: togli la stanza dall'elenco; elimina il lavoro/idea solo
+    // se era l'unica stanza (in tal caso scollega la sua spesa).
+    function pruneList(list) {
+      var kept = [];
+      list.forEach(function (it) {
+        var idx = (it.roomIds || []).indexOf(id);
+        if (idx >= 0) {
+          it.roomIds = it.roomIds.filter(function (x) { return x !== id; });
+          if (it.roomIds.length === 0) {
+            unlinkShopping(it.id.indexOf("task") === 0 ? "task" : "idea", it.id);
+            return; // niente più stanze -> elimina
+          }
+        }
+        kept.push(it);
+      });
+      return kept;
+    }
+    state.data.tasks = pruneList(state.data.tasks);
+    state.data.ideas = pruneList(state.data.ideas);
     unlinkShopping("room", id);
     state.data.house.rooms = state.data.house.rooms.filter(function (r) { return r.id !== id; });
-    state.data.tasks = state.data.tasks.filter(function (t) { return t.roomId !== id; });
-    state.data.ideas = state.data.ideas.filter(function (i) { return i.roomId !== id; });
     persist();
   }
 
@@ -328,6 +381,7 @@
     elNav.hidden = false;
     elView.classList.remove("is-fullscreen");
     elHeader.innerHTML = headerHtml(route);
+    applyHeaderRoom(route);
     if (!elNav.dataset.built) { elNav.innerHTML = navHtml(); elNav.dataset.built = "1"; }
     updateNav(route.name);
 
@@ -361,21 +415,59 @@
     return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }
 
+  // Intestazione colorata della stanza (fusa con la barra) + offset vista
+  function applyHeaderRoom(route) {
+    // L'header colorato è solo per la pagina stanza (un solo colore per stanza).
+    var color = null;
+    if (route.name === "stanza") {
+      var r = findRoom(route.param);
+      if (r) color = r.color;
+    }
+    if (color) {
+      elHeader.classList.add("is-room");
+      elHeader.classList.remove("is-collapsed");
+      elHeader.style.setProperty("--room-color", color);
+      elView.classList.add("view--room");
+    } else {
+      elHeader.classList.remove("is-room", "is-collapsed");
+      elHeader.style.removeProperty("--room-color");
+      elView.classList.remove("view--room");
+    }
+  }
+
+  function onScroll() {
+    if (!elHeader.classList.contains("is-room")) return;
+    elHeader.classList.toggle("is-collapsed", (window.scrollY || window.pageYOffset || 0) > 24);
+  }
+
+  // Header colorato (col colore della stanza) condiviso da stanza/lavoro/idea
+  function coloredHeaderHtml(backAction, iconKey, title, subtitleInner) {
+    return '<button class="header-btn hdr-back" data-action="' + backAction + '" aria-label="Indietro">' + svg("back") + "</button>" +
+      '<span class="hdr-room-ico">' + svg(iconKey) + "</span>" +
+      '<div class="hdr-room-info">' +
+        '<div class="hdr-room-name">' + h(title) + "</div>" +
+        '<div class="hdr-room-floor">' + subtitleInner + "</div>" +
+      "</div>";
+  }
+  function slimHeaderHtml(backAction, title) {
+    return '<button class="header-btn" data-action="' + backAction + '" aria-label="Indietro">' + svg("back") + "</button>" +
+      '<div class="grow"><div class="header-title">' + h(title) + "</div></div>";
+  }
+
   function headerHtml(route) {
     if (route.name === "stanza") {
       var r = findRoom(route.param);
-      return '<button class="header-btn" data-action="back-home" aria-label="Torna alla Home">' + svg("back") + "</button>" +
-        '<div class="grow"><div class="header-title">' + h(r ? r.name : "Stanza") + "</div></div>";
+      if (!r) return slimHeaderHtml("back-home", "Stanza");
+      return coloredHeaderHtml("back-home", roomIcon(r.icon), r.name,
+        svg("layers", "ico-sm") + '<span>' + h(floorNameOf(r.floorId)) + "</span>");
     }
     if (route.name === "lavoro") {
       var t = findTask(route.param);
-      return '<button class="header-btn" data-action="back-task" aria-label="Indietro">' + svg("back") + "</button>" +
-        '<div class="grow"><div class="header-title">' + h(t ? t.title : "Lavoro") + "</div></div>";
+      return slimHeaderHtml("back-task", t ? t.title : "Lavoro");
     }
     if (route.name === "idea") {
       var idd = findIdea(route.param);
-      return '<button class="header-btn" data-action="back-idea" aria-label="Indietro">' + svg("back") + "</button>" +
-        '<div class="grow"><div class="header-title">' + h(idd ? idd.title : "Idea") + "</div></div>";
+      return slimHeaderHtml("back-idea", idd ? idd.title : "Idea");
     }
     var titles = { home: "Casa App", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
     return '<div class="grow"><div class="header-title">' + titles[route.name] + "</div></div>";
@@ -497,6 +589,7 @@
     var open = tasks.filter(function (t) { return t.status !== "fatto"; }).length;
     var alta = tasks.filter(function (t) { return t.priority === "alta" && t.status !== "fatto"; }).length;
     var done = tasks.filter(function (t) { return t.status === "fatto"; }).length;
+    var overdue = tasks.filter(isOverdueOpen).length;
     var ideasN = state.data.ideas.length;
 
     var stats =
@@ -504,6 +597,7 @@
         stat(total, "Lavori", "") +
         stat(open, "Aperti", "accent") +
         stat(alta, "Alta prio.", "alta") +
+        stat(overdue, "Scaduti", "scaduti") +
         stat(done, "Completati", "fatto") +
         stat(ideasN, "Idee", "") +
       "</div>";
@@ -532,14 +626,14 @@
   function roomCard(r) {
     var open = openTasksOf(r.id).length;
     var ideasN = ideasOf(r.id).length;
+    var pills = "";
+    if (open > 0) pills += '<span class="count-pill">' + svg("tasks", "ico-sm") + open + " aperti</span>";
+    if (ideasN > 0) pills += '<span class="count-pill">' + svg("bulb", "ico-sm") + ideasN + " idee</span>";
     return '<button class="card card-tap room-card" data-action="open-room" data-id="' + r.id + '">' +
       '<span class="room-ico" style="background:' + h(r.color) + '">' + svg(roomIcon(r.icon)) + "</span>" +
       '<span class="room-info">' +
         '<span class="room-name">' + h(r.name) + "</span>" +
-        '<span class="room-counts">' +
-          '<span class="count-pill">' + svg("tasks", "ico-sm") + open + " aperti</span>" +
-          '<span class="count-pill">' + svg("bulb", "ico-sm") + ideasN + " idee</span>" +
-        "</span>" +
+        (pills ? '<span class="room-counts">' + pills + "</span>" : "") +
       "</span>" +
       '<span class="room-chevron">' + svg("chevron") + "</span>" +
       "</button>";
@@ -587,9 +681,8 @@
           iconBtn("del-task", t.id, "trash", "Elimina lavoro", true) +
         "</div>" +
       "</div>" +
-      '<div class="task-loc">' + svg("pin", "ico-sm") + h(roomName(t.roomId)) +
-        '<span class="sep">•</span>' + h(roomFloorName(t.roomId)) + "</div>" +
-      '<div class="task-badges">' + (t.status === "fatto" ? "" : prioBadge(t.priority)) + statusBadge(t.status) + chkPill + shopPill + "</div>" +
+      '<div class="task-loc">' + locCompactHtml(t.roomIds) + "</div>" +
+      '<div class="task-badges">' + (t.status === "fatto" ? "" : prioBadge(t.priority)) + statusBadge(t.status) + dueBadgeHtml(t) + chkPill + shopPill + "</div>" +
       "</div>";
   }
 
@@ -622,8 +715,7 @@
           iconBtn("del-idea", i.id, "trash", "Elimina idea", true) +
         "</div>" +
       "</div>" +
-      '<div class="idea-loc">' + svg("pin", "ico-sm") + h(roomName(i.roomId)) +
-        '<span class="sep">•</span>' + h(roomFloorName(i.roomId)) + "</div>" +
+      '<div class="idea-loc">' + locCompactHtml(i.roomIds) + "</div>" +
       (i.description ? '<div class="idea-desc">' + h(i.description) + "</div>" : "") +
       '<div class="idea-foot">' + ideaBadge(i.status) + costBadge + clistPill + shopPill + "</div>" +
       "</div>";
@@ -654,14 +746,6 @@
       : emptyState("bulb", "Nessuna idea", "Aggiungi un'idea per questa stanza.");
 
     return '' +
-      '<div class="room-hero" style="background:' + h(r.color) + '">' +
-        '<span class="room-hero-ico">' + svg(roomIcon(r.icon)) + "</span>" +
-        '<span class="room-hero-info">' +
-          '<span class="room-hero-name">' + h(r.name) + "</span>" +
-          '<span class="room-hero-floor">' + svg("layers", "ico-sm") + h(floorNameOf(r.floorId)) + "</span>" +
-        "</span>" +
-      "</div>" +
-
       '<div class="room-stat-row">' +
         '<div class="room-stat"><span class="rs-ico">' + svg("tasks") + '</span><span><span class="rs-val mono">' + openN + '</span><span class="rs-lbl">Lavori aperti</span></span></div>' +
         '<div class="room-stat"><span class="rs-ico">' + svg("bulb") + '</span><span><span class="rs-val mono">' + ideasN + '</span><span class="rs-lbl">Idee</span></span></div>' +
@@ -671,8 +755,6 @@
         '<button class="btn btn-primary" data-action="add-task-room" data-room="' + r.id + '">' + svg("plus") + "Lavoro</button>" +
         '<button class="btn" data-action="add-idea-room" data-room="' + r.id + '">' + svg("plus") + "Idea</button>" +
       "</div>" +
-
-      (r.notes ? '<div class="room-notes">' + h(r.notes) + "</div>" : "") +
 
       '<section class="section"><div class="section-head"><h2>Lavori</h2></div>' + tasksBlock + "</section>" +
       '<section class="section"><div class="section-head"><h2>Idee</h2></div>' + ideasBlock + "</section>";
@@ -696,10 +778,8 @@
             iconBtn("del-task", t.id, "trash", "Elimina lavoro", true) +
           "</div>" +
         "</div>" +
-        '<button class="task-loc detail-loc" data-action="open-room" data-id="' + t.roomId + '">' +
-          svg("pin", "ico-sm") + h(roomName(t.roomId)) + '<span class="sep">•</span>' + h(roomFloorName(t.roomId)) +
-        "</button>" +
-        '<div class="task-badges">' + (done ? "" : prioBadge(t.priority)) + statusBadge(t.status) + "</div>" +
+        locChipsHtml(t.roomIds) +
+        '<div class="task-badges">' + (done ? "" : prioBadge(t.priority)) + statusBadge(t.status) + dueBadgeHtml(t) + "</div>" +
         (t.description ? '<p class="detail-desc">' + h(t.description) + "</p>" : "") +
       "</div>";
 
@@ -717,11 +797,13 @@
     emptyText = emptyText || "Nessuna voce. Aggiungi i passi o le cose da comprare per questo lavoro.";
     var doneN = items.filter(function (c) { return c.done; }).length;
     var pct = items.length ? Math.round((doneN / items.length) * 100) : 0;
+    var canReorder = items.length > 1;
     var rows = items.length
       ? '<div class="check-list">' + items.map(function (c) {
-          return '<div class="check-row">' +
+          return '<div class="check-row" data-id="' + c.id + '">' +
             '<button class="check-box' + (c.done ? " is-done" : "") + '" data-action="toggle-check" data-id="' + c.id + '" aria-label="' + (c.done ? "Annulla spunta" : "Spunta") + '">' + svg("check", "ico-sm") + "</button>" +
             '<span class="check-text' + (c.done ? " is-done" : "") + '">' + h(c.text) + "</span>" +
+            (canReorder ? '<button class="drag-handle" type="button" aria-label="Trascina per riordinare">' + svg("grip") + "</button>" : "") +
             iconBtn("del-check", c.id, "trash", "Elimina voce", true) +
           "</div>";
         }).join("") + "</div>"
@@ -754,9 +836,7 @@
             iconBtn("del-idea", i.id, "trash", "Elimina idea", true) +
           "</div>" +
         "</div>" +
-        '<button class="task-loc detail-loc" data-action="open-room" data-id="' + i.roomId + '">' +
-          svg("pin", "ico-sm") + h(roomName(i.roomId)) + '<span class="sep">•</span>' + h(roomFloorName(i.roomId)) +
-        "</button>" +
+        locChipsHtml(i.roomIds) +
         '<div class="task-badges">' + ideaBadge(i.status) +
           (i.cost ? '<span class="badge badge-soft idea-cost">' + svg("coin", "ico-sm") + h(i.cost) + "</span>" : "") +
         "</div>" +
@@ -793,17 +873,44 @@
   }
 
   // ---------- LISTA SPESA ----------
+  function shopCatOptions(current, placeholder) {
+    return '<option value="">' + (placeholder || "Nessuna") + "</option>" +
+      CONFIG.SHOP_CATEGORIES.map(function (c) {
+        return '<option value="' + c.k + '"' + (c.k === current ? " selected" : "") + ">" + h(c.l) + "</option>";
+      }).join("");
+  }
+  function matchShopFilter(s) {
+    if (state.shopFilter === "tutte") return true;
+    if (state.shopFilter === "_none_") return !s.category;
+    return s.category === state.shopFilter;
+  }
+  function shopFilterBar(items) {
+    var present = {}, hasNone = false;
+    items.forEach(function (s) { if (s.category) present[s.category] = true; else hasNone = true; });
+    var cats = CONFIG.SHOP_CATEGORIES.filter(function (c) { return present[c.k]; });
+    if (cats.length === 0) return ""; // niente da filtrare
+    var segs = '<button class="seg-btn' + (state.shopFilter === "tutte" ? " is-active" : "") + '" data-action="filter-shop" data-cat="tutte">Tutte</button>';
+    cats.forEach(function (c) {
+      segs += '<button class="seg-btn' + (state.shopFilter === c.k ? " is-active" : "") + '" data-action="filter-shop" data-cat="' + c.k + '">' + h(c.l) + "</button>";
+    });
+    if (hasNone) segs += '<button class="seg-btn' + (state.shopFilter === "_none_" ? " is-active" : "") + '" data-action="filter-shop" data-cat="_none_">Senza categoria</button>';
+    return '<div class="segmented filter-bar">' + segs + "</div>";
+  }
+
   function viewSpesa() {
     var all = state.data.shopping.slice();
-    var todo = all.filter(function (s) { return !s.done; }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
-    var bought = all.filter(function (s) { return s.done; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    // Reset del filtro se la categoria selezionata non è più presente
+    if (state.shopFilter !== "tutte" && !all.some(matchShopFilter)) state.shopFilter = "tutte";
+
+    var todo = all.filter(function (s) { return !s.done && matchShopFilter(s); }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+    var bought = all.filter(function (s) { return s.done && matchShopFilter(s); }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
 
     var addForm =
       '<form class="shop-add" data-action="add-shop">' +
         '<input class="input" type="text" name="text" placeholder="Cosa serve?" maxlength="80" autocomplete="off" />' +
         '<div class="shop-add-row">' +
           '<input class="input shop-qty" type="text" name="qty" placeholder="Q.tà" maxlength="20" autocomplete="off" />' +
-          '<select class="select" name="link" aria-label="Collega a">' + linkOptionsHtml() + "</select>" +
+          '<select class="select" name="category" aria-label="Dove comprare">' + shopCatOptions("", "Dove? (categoria)") + "</select>" +
           '<button class="setup-inline-add" type="submit" aria-label="Aggiungi alla lista">' + svg("plus") + "</button>" +
         "</div>" +
       "</form>";
@@ -813,8 +920,9 @@
       body = emptyState("cart", "Lista vuota", "Aggiungi gli articoli che ti servono con il campo qui sopra.");
     } else {
       body =
+        shopFilterBar(all) +
         (todo.length ? '<div class="stack">' + todo.map(shopRow).join("") + "</div>"
-                     : '<p class="check-empty">Tutto preso. Bel lavoro!</p>') +
+                     : '<p class="check-empty">Niente da prendere in questo filtro.</p>') +
         (bought.length
           ? '<div class="section-head" style="margin-top:20px"><h2>Presi</h2>' +
               '<button class="btn btn-sm btn-ghost" data-action="clear-bought">Svuota presi</button></div>' +
@@ -826,15 +934,54 @@
   }
 
   function shopRow(s) {
-    return '<div class="shop-row' + (s.done ? " is-done" : "") + '">' +
+    var cat = s.category ? '<span class="shop-cat">' + svg("bag", "ico-sm") + "<span>" + h(shopCatLabel(s.category)) + "</span></span>" : "";
+    var link = shopLinkTag(s);
+    var tags = (cat || link) ? '<span class="shop-tags">' + cat + link + "</span>" : "";
+    var note = s.note ? '<span class="shop-note">' + h(s.note) + "</span>" : "";
+    return '<div class="shop-row' + (s.done ? " is-done" : "") + '" data-action="open-shop" data-id="' + s.id + '">' +
       '<button class="check-box' + (s.done ? " is-done" : "") + '" data-action="toggle-shop" data-id="' + s.id + '" aria-label="' + (s.done ? "Annulla" : "Segna come preso") + '">' + svg("check", "ico-sm") + "</button>" +
       '<span class="shop-main">' +
         '<span class="shop-text' + (s.done ? " is-done" : "") + '">' + h(s.text) + "</span>" +
-        shopLinkTag(s) +
+        tags + note +
       "</span>" +
       (s.qty ? '<span class="shop-qty-badge mono">' + h(s.qty) + "</span>" : "") +
       iconBtn("del-shop", s.id, "trash", "Elimina articolo", true) +
     "</div>";
+  }
+
+  // Modale modifica articolo di spesa
+  function openShopModal(item) {
+    if (!item) return;
+    var inner =
+      modalHead("Modifica articolo") +
+      '<form class="modal-body" data-action="save-shop" data-id="' + item.id + '">' +
+        field("Articolo", '<input class="input" type="text" name="text" maxlength="80" autocomplete="off" value="' + h(item.text) + '" />') +
+        '<div class="field-row">' +
+          field("Quantità", '<input class="input" type="text" name="qty" maxlength="20" autocomplete="off" placeholder="Q.tà" value="' + h(item.qty) + '" />') +
+          field("Dove comprare", '<select class="select" name="category">' + shopCatOptions(item.category, "Nessuna") + "</select>") +
+        "</div>" +
+        field("Nota", '<textarea class="textarea" name="note" maxlength="200" placeholder="Misura, colore, modello…">' + h(item.note) + "</textarea>") +
+        field("Collega a", '<select class="select" name="link">' + linkOptionsHtml(item.linkType, item.linkId) + "</select>") +
+        '<div class="modal-actions">' +
+          '<button class="btn btn-ghost" type="button" data-action="modal-close">Annulla</button>' +
+          '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
+        "</div>" +
+      "</form>";
+    openModal(inner);
+  }
+  function saveShop(form) {
+    var item = findShop(form.getAttribute("data-id"));
+    if (!item) { closeModal(); return; }
+    var text = val(form, "text");
+    if (!text) { toast("Scrivi cosa serve", "error"); return; }
+    item.text = text;
+    item.qty = val(form, "qty");
+    item.category = val(form, "category");
+    item.note = val(form, "note");
+    var linkRaw = val(form, "link"), lt = "", li = null;
+    if (linkRaw) { var pp = linkRaw.split(":"); lt = pp[0]; li = pp.slice(1).join(":") || null; }
+    item.linkType = lt; item.linkId = li;
+    persist(); closeModal(); toast("Articolo salvato", "success"); render();
   }
 
   function shopLinkTag(s) {
@@ -957,18 +1104,23 @@
 
   // --- LAVORO ---
   function openTaskModal(task, presetRoomId) {
-    if (rooms().length === 0) { toast("Crea prima una stanza", "error"); return; }
     var isEdit = !!task;
-    var rid = task ? task.roomId : (presetRoomId || rooms()[0].id);
+    var sel = task ? (task.roomIds || []) : (presetRoomId ? [presetRoomId] : []);
     var inner =
       modalHead(isEdit ? "Modifica lavoro" : "Nuovo lavoro") +
       '<form class="modal-body" data-action="save-task" data-id="' + (task ? task.id : "") + '">' +
         field("Titolo", '<input class="input" type="text" name="title" maxlength="80" autocomplete="off" placeholder="Es. Riparare rubinetto" value="' + h(task ? task.title : "") + '" />') +
-        field("Stanza", select("roomId", roomOptions(rid))) +
+        '<div class="field"><label>Stanze</label>' + roomChipsSelector(sel) +
+          '<div class="field-hint">Tocca per assegnare a una o più stanze (facoltativo).</div></div>' +
         '<div class="field-row">' +
           field("Priorità", select("priority", optionsFrom(PRIO_LABEL, task ? task.priority : "media"))) +
           field("Stato", select("status", optionsFrom(STATUS_LABEL, task ? task.status : "da_fare"))) +
         "</div>" +
+        '<div class="field"><label>Scadenza (facoltativa)</label>' +
+          '<div class="due-field">' +
+            '<input class="input" type="date" name="dueDate" value="' + h(task ? task.dueDate : "") + '" />' +
+            '<button type="button" class="btn btn-ghost btn-sm" data-action="clear-due">Rimuovi</button>' +
+          "</div></div>" +
         field("Descrizione", '<textarea class="textarea" name="description" maxlength="600" placeholder="Dettagli (facoltativo)">' + h(task ? task.description : "") + "</textarea>") +
         '<div class="modal-actions">' +
           '<button class="btn btn-ghost" type="button" data-action="modal-close">Annulla</button>' +
@@ -980,14 +1132,14 @@
 
   // --- IDEA ---
   function openIdeaModal(idea, presetRoomId) {
-    if (rooms().length === 0) { toast("Crea prima una stanza", "error"); return; }
     var isEdit = !!idea;
-    var rid = idea ? idea.roomId : (presetRoomId || rooms()[0].id);
+    var sel = idea ? (idea.roomIds || []) : (presetRoomId ? [presetRoomId] : []);
     var inner =
       modalHead(isEdit ? "Modifica idea" : "Nuova idea") +
       '<form class="modal-body" data-action="save-idea" data-id="' + (idea ? idea.id : "") + '">' +
         field("Titolo", '<input class="input" type="text" name="title" maxlength="80" autocomplete="off" placeholder="Es. Parete attrezzata" value="' + h(idea ? idea.title : "") + '" />') +
-        field("Stanza", select("roomId", roomOptions(rid))) +
+        '<div class="field"><label>Stanze</label>' + roomChipsSelector(sel) +
+          '<div class="field-hint">Tocca per assegnare a una o più stanze (facoltativo).</div></div>' +
         '<div class="field-row">' +
           field("Stato", select("status", optionsFrom(IDEA_LABEL, idea ? idea.status : "bozza"))) +
           field("Stima costo", '<input class="input" type="text" name="cost" inputmode="decimal" maxlength="20" autocomplete="off" placeholder="Es. 1200 €" value="' + h(idea ? idea.cost : "") + '" />') +
@@ -1106,7 +1258,6 @@
         field("Icona", iconPicker) +
         '<input type="hidden" name="color" value="' + curColor + '" />' +
         field("Colore", colorPicker) +
-        field("Note", '<textarea class="textarea" name="notes" maxlength="400" placeholder="Note sulla stanza (facoltativo)">' + h(room ? room.notes : "") + "</textarea>") +
         '<div class="modal-actions">' +
           '<button class="btn btn-ghost" type="button" data-action="back-rooms">Annulla</button>' +
           '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
@@ -1229,10 +1380,13 @@
         var linkRaw = val(node, "link");
         var linkType = "", linkId = null;
         if (linkRaw) { var pp = linkRaw.split(":"); linkType = pp[0]; linkId = pp.slice(1).join(":") || null; }
-        state.data.shopping.push(createShopItem({ text: stext, qty: val(node, "qty"), linkType: linkType, linkId: linkId }));
+        state.data.shopping.push(createShopItem({ text: stext, qty: val(node, "qty"), category: val(node, "category"), linkType: linkType, linkId: linkId }));
         persist(); render();
         break;
       }
+      case "open-shop": openShopModal(findShop(id)); break;
+      case "save-shop": saveShop(node); break;
+      case "filter-shop": state.shopFilter = node.getAttribute("data-cat"); render(); break;
       case "toggle-shop": { var sh = findShop(id); if (sh) { sh.done = !sh.done; persist(); render(); } break; }
       case "del-shop": {
         state.data.shopping = state.data.shopping.filter(function (x) { return x.id !== id; });
@@ -1317,11 +1471,17 @@
       case "back-rooms": openManageRoomsOfFloor(state.manageFloorId); break;
       case "del-room": {
         var r = findRoom(id);
-        var nT = tasksOf(id).length, nI = ideasOf(id).length;
+        var inT = tasksOf(id), inI = ideasOf(id);
+        var delN = inT.filter(function (t) { return t.roomIds.length === 1; }).length +
+                   inI.filter(function (i) { return i.roomIds.length === 1; }).length;
+        var moveN = (inT.length + inI.length) - delN;
+        var w = "";
+        if (delN > 0) w += "Verranno eliminati " + delN + " elementi presenti solo in questa stanza.";
+        if (moveN > 0) w += (w ? " " : "") + "Altri " + moveN + " resteranno (scollegati da questa stanza).";
         openConfirm({
           title: "Elimina stanza",
           message: "Vuoi eliminare <strong>" + h(r.name) + "</strong>?",
-          warn: (nT + nI) > 0 ? ("Verranno eliminati anche " + nT + " lavori e " + nI + " idee collegati.") : "",
+          warn: w,
           onConfirm: function () { deleteRoom(id); toast("Dati eliminati", "success"); render(); openManageRoomsOfFloor(state.manageFloorId); },
           onCancel: function () { openManageRoomsOfFloor(state.manageFloorId); }
         });
@@ -1331,6 +1491,9 @@
       /* --- pickers dentro modale stanza --- */
       case "pick-icon": pickInGroup(node, "icon-opt", "icon"); break;
       case "pick-color": pickInGroup(node, "color-opt", "color"); break;
+      case "toggle-room-chip": node.classList.toggle("is-active"); updateFloorCount(node); break;
+      case "toggle-floor-group": { var g = node.closest(".chip-floor-group"); if (g) g.classList.toggle("is-open"); break; }
+      case "clear-due": { var di = elModal.querySelector('input[name="dueDate"]'); if (di) di.value = ""; break; }
 
       /* --- modale/conferma generici --- */
       case "modal-close": closeModal(); break;
@@ -1343,20 +1506,21 @@
   function saveTask(form) {
     var title = val(form, "title");
     if (!title) { toast("Inserisci un titolo", "error"); return; }
-    var roomId = val(form, "roomId");
+    var roomIds = readSelectedRooms();
     var priority = val(form, "priority") || "media";
     var status = val(form, "status") || "da_fare";
     var description = val(form, "description");
+    var dueDate = val(form, "dueDate");
     var id = form.getAttribute("data-id");
     if (id) {
       var t = findTask(id);
       var wasDone = t.status === "fatto";
-      t.title = title; t.roomId = roomId; t.priority = priority; t.status = status;
-      t.description = description; t.updatedAt = nowISO();
+      t.title = title; t.roomIds = roomIds; t.priority = priority; t.status = status;
+      t.description = description; t.dueDate = dueDate; t.updatedAt = nowISO();
       if (status === "fatto" && !wasDone) t.completedAt = nowISO();
       if (status !== "fatto") t.completedAt = null;
     } else {
-      state.data.tasks.push(createTask({ title: title, roomId: roomId, priority: priority, status: status, description: description }));
+      state.data.tasks.push(createTask({ title: title, roomIds: roomIds, priority: priority, status: status, description: description, dueDate: dueDate }));
     }
     persist(); closeModal(); toast("Lavoro salvato", "success"); render();
   }
@@ -1364,7 +1528,7 @@
   function saveIdea(form) {
     var title = val(form, "title");
     if (!title) { toast("Inserisci un titolo", "error"); return; }
-    var roomId = val(form, "roomId");
+    var roomIds = readSelectedRooms();
     var status = val(form, "status") || "bozza";
     var description = val(form, "description");
     var cost = val(form, "cost");
@@ -1372,10 +1536,10 @@
     var id = form.getAttribute("data-id");
     if (id) {
       var i = findIdea(id);
-      i.title = title; i.roomId = roomId; i.status = status; i.description = description;
+      i.title = title; i.roomIds = roomIds; i.status = status; i.description = description;
       i.cost = cost; i.link = link; i.updatedAt = nowISO();
     } else {
-      state.data.ideas.push(createIdea({ title: title, roomId: roomId, status: status, description: description, cost: cost, link: link }));
+      state.data.ideas.push(createIdea({ title: title, roomIds: roomIds, status: status, description: description, cost: cost, link: link }));
     }
     persist(); closeModal(); toast("Idea salvata", "success"); render();
   }
@@ -1395,14 +1559,14 @@
     var floorId = val(form, "floorId");
     var icon = val(form, "icon") || "door";
     var color = val(form, "color") || CONFIG.DEFAULT_ACCENT;
-    var notes = val(form, "notes");
     var id = form.getAttribute("data-id");
     if (id) {
       var r = findRoom(id);
-      r.name = name; r.floorId = floorId; r.icon = icon; r.color = color; r.notes = notes;
+      // Le note non sono più modificabili dal form: si conservano invariate.
+      r.name = name; r.floorId = floorId; r.icon = icon; r.color = color;
       toast("Stanza salvata", "success");
     } else {
-      state.data.house.rooms.push(createRoom(name, floorId, { icon: icon, color: color, notes: notes }));
+      state.data.house.rooms.push(createRoom(name, floorId, { icon: icon, color: color }));
       toast("Stanza creata", "success");
     }
     persist(); render(); openManageRoomsOfFloor(state.manageFloorId);
@@ -1544,6 +1708,69 @@
     return el ? String(el.value).trim() : "";
   }
 
+  // ---- Multi-stanza: visualizzazione e selezione ----
+  // Posizione compatta per le card delle liste: "Stanza • Piano" oppure "Stanza +N"
+  function locCompactHtml(roomIds) {
+    roomIds = roomIds || [];
+    if (roomIds.length === 0) return svg("pin", "ico-sm") + "Senza stanza";
+    var first = findRoom(roomIds[0]);
+    var name = first ? first.name : "Stanza";
+    if (roomIds.length === 1) {
+      return svg("pin", "ico-sm") + h(name) + '<span class="sep">•</span>' + h(roomFloorName(roomIds[0]));
+    }
+    return svg("pin", "ico-sm") + h(name) + '<span class="loc-more">+' + (roomIds.length - 1) + "</span>";
+  }
+  // Chip delle stanze per il dettaglio (ognuno apre la stanza)
+  function locChipsHtml(roomIds) {
+    roomIds = roomIds || [];
+    if (roomIds.length === 0) {
+      return '<div class="loc-chips"><span class="loc-chip is-none">' + svg("pin", "ico-sm") + "Senza stanza</span></div>";
+    }
+    return '<div class="loc-chips">' + roomIds.map(function (rid) {
+      var r = findRoom(rid);
+      if (!r) return "";
+      return '<button class="loc-chip" data-action="open-room" data-id="' + rid + '">' + svg("pin", "ico-sm") +
+        h(r.name) + '<span class="loc-chip-floor">' + h(floorNameOf(r.floorId)) + "</span></button>";
+    }).join("") + "</div>";
+  }
+  // Selettore a chip (multi) raggruppato per piano, gruppi comprimibili.
+  function roomChipsSelector(selectedIds) {
+    selectedIds = selectedIds || [];
+    var any = false;
+    var html = floors().map(function (f) {
+      var rs = roomsOf(f.id);
+      if (!rs.length) return "";
+      any = true;
+      var selCount = rs.filter(function (r) { return selectedIds.indexOf(r.id) >= 0; }).length;
+      var chips = rs.map(function (r) {
+        var on = selectedIds.indexOf(r.id) >= 0;
+        return '<button type="button" class="room-chip' + (on ? " is-active" : "") + '" data-action="toggle-room-chip" data-id="' + r.id + '">' +
+          '<span class="room-chip-dot" style="background:' + h(r.color) + '"></span>' + h(r.name) + "</button>";
+      }).join("");
+      return '<div class="chip-floor-group">' +
+          '<button type="button" class="chip-floor-head" data-action="toggle-floor-group">' +
+            '<span class="chip-floor-caret">' + svg("chevron") + "</span>" +
+            '<span class="chip-floor-label">' + h(f.name) + "</span>" +
+            '<span class="chip-floor-count' + (selCount ? "" : " is-empty") + '">' + selCount + "</span>" +
+          "</button>" +
+          '<div class="chip-floor-body">' + chips + "</div>" +
+        "</div>";
+    }).join("");
+    return any ? html : '<div class="field-hint">Nessuna stanza disponibile.</div>';
+  }
+  // Aggiorna il contatore "selezionate" del piano dopo un tocco su una chip
+  function updateFloorCount(chip) {
+    var group = chip.closest ? chip.closest(".chip-floor-group") : null;
+    if (!group) return;
+    var n = group.querySelectorAll(".room-chip.is-active").length;
+    var badge = group.querySelector(".chip-floor-count");
+    if (badge) { badge.textContent = n; badge.classList.toggle("is-empty", n === 0); }
+  }
+  function readSelectedRooms() {
+    return Array.prototype.slice.call(elModal.querySelectorAll(".room-chip.is-active"))
+      .map(function (c) { return c.getAttribute("data-id"); });
+  }
+
   function iconBtn(action, id, icon, label, danger) {
     return '<button class="icon-btn' + (danger ? " is-danger" : "") + '" data-action="' + action + '" data-id="' + id + '" aria-label="' + label + '">' + svg(icon) + "</button>";
   }
@@ -1585,6 +1812,41 @@
     return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
   }
 
+  // ---- Scadenze (data "YYYY-MM-DD") ----
+  function daysUntil(dateKey) {
+    var p = String(dateKey).split("-");
+    if (p.length !== 3) return NaN;
+    var due = new Date(+p[0], +p[1] - 1, +p[2]);
+    var t = new Date(); t.setHours(0, 0, 0, 0);
+    return Math.round((due - t) / 86400000);
+  }
+  function formatDateShort(dateKey) {
+    var p = String(dateKey).split("-");
+    if (p.length !== 3) return dateKey;
+    return p[2] + "/" + p[1] + "/" + p[0].slice(2);
+  }
+  // Stato scadenza di un lavoro: kind + classe + etichetta
+  function dueInfo(task) {
+    var dd = task.dueDate;
+    if (!dd) return null;
+    var n = daysUntil(dd);
+    if (isNaN(n)) return null;
+    if (task.status === "fatto") return { cls: "due-done", label: formatDateShort(dd) };
+    if (n < 0) return { cls: "due-overdue", label: "Scaduto" };
+    if (n === 0) return { cls: "due-today", label: "Oggi" };
+    if (n === 1) return { cls: "due-soon", label: "Domani" };
+    if (n <= 3) return { cls: "due-soon", label: "Tra " + n + " gg" };
+    return { cls: "due-future", label: formatDateShort(dd) };
+  }
+  function dueBadgeHtml(task) {
+    var info = dueInfo(task);
+    if (!info) return "";
+    return '<span class="badge due-badge ' + info.cls + '">' + svg("calendar", "ico-sm") + info.label + "</span>";
+  }
+  function isOverdueOpen(task) {
+    return task.status !== "fatto" && task.dueDate && daysUntil(task.dueDate) < 0;
+  }
+
   /* ==========================================================
      BOOT — listener centralizzati + avvio
      ========================================================== */
@@ -1607,6 +1869,67 @@
     handleAction(form.getAttribute("data-action"), form, e);
   }
 
+  /* ---- Drag & drop per riordinare la checklist (Pointer Events: mouse + touch) ---- */
+  var dragState = null;
+
+  function rowIdsOf(list) {
+    return Array.prototype.slice.call(list.querySelectorAll(".check-row"))
+      .map(function (r) { return r.getAttribute("data-id"); });
+  }
+
+  function onPointerDown(e) {
+    var handle = e.target.closest ? e.target.closest(".drag-handle") : null;
+    if (!handle) return;
+    var row = handle.closest(".check-row");
+    var list = row ? row.closest(".check-list") : null;
+    if (!row || !list) return;
+    e.preventDefault();
+    dragState = { row: row, list: list, startOrder: rowIdsOf(list).join("|") };
+    row.classList.add("dragging");
+    document.body.classList.add("is-dragging");
+    try { row.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+
+  function onPointerMove(e) {
+    if (!dragState) return;
+    e.preventDefault();
+    var y = e.clientY;
+    var rows = Array.prototype.slice.call(dragState.list.querySelectorAll(".check-row"));
+    var ref = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] === dragState.row) continue;
+      var rect = rows[i].getBoundingClientRect();
+      if (y < rect.top + rect.height / 2) { ref = rows[i]; break; }
+    }
+    if (ref) { if (dragState.row.nextSibling !== ref) dragState.list.insertBefore(dragState.row, ref); }
+    else if (dragState.list.lastElementChild !== dragState.row) { dragState.list.appendChild(dragState.row); }
+  }
+
+  function onPointerUp(e) {
+    if (!dragState) return;
+    var st = dragState;
+    dragState = null;
+    st.row.classList.remove("dragging");
+    document.body.classList.remove("is-dragging");
+    try { st.row.releasePointerCapture(e.pointerId); } catch (err) {}
+    var ids = rowIdsOf(st.list);
+    if (ids.join("|") !== st.startOrder) commitChecklistOrder(ids);
+  }
+
+  function commitChecklistOrder(ids) {
+    var owner = currentChecklistOwner();
+    if (!owner || !Array.isArray(owner.checklist)) return;
+    var byId = {};
+    owner.checklist.forEach(function (c) { byId[c.id] = c; });
+    var arr = [];
+    ids.forEach(function (id) { if (byId[id]) { arr.push(byId[id]); delete byId[id]; } });
+    owner.checklist.forEach(function (c) { if (byId[c.id]) arr.push(c); }); // eventuali residui
+    owner.checklist = arr;
+    owner.updatedAt = nowISO();
+    persist();
+    // Niente render(): il DOM è già nell'ordine corretto (evita il flash).
+  }
+
   function boot() {
     elHeader = document.getElementById("app-header");
     elView = document.getElementById("view");
@@ -1620,7 +1943,12 @@
 
     document.addEventListener("click", onClick, false);
     document.addEventListener("submit", onSubmit, false);
+    document.addEventListener("pointerdown", onPointerDown, false);
+    document.addEventListener("pointermove", onPointerMove, false);
+    document.addEventListener("pointerup", onPointerUp, false);
+    document.addEventListener("pointercancel", onPointerUp, false);
     window.addEventListener("hashchange", render, false);
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     render();
   }

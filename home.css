@@ -38,6 +38,7 @@
 }
 .stat.accent .stat-val { color: var(--accent); }
 .stat.alta .stat-val { color: var(--prio-alta); }
+.stat.scaduti .stat-val { color: var(--danger); }
 .stat.fatto .stat-val { color: var(--stato-fatto); }
 
 /* Piano/area */

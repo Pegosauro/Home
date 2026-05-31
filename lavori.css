@@ -80,6 +80,20 @@
   padding-top: 4px; border-top: 1px solid var(--border);
 }
 
+/* Multi-stanza */
+.loc-more { color: var(--text-mut); font-weight: 700; font-size: 12px; margin-left: 4px; }
+.loc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.loc-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: var(--radius-pill);
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-soft); font-size: 13px; font-weight: 600;
+}
+.loc-chip:active { background: var(--surface-3); }
+.loc-chip .ico { width: 14px; height: 14px; flex: none; }
+.loc-chip .loc-chip-floor { color: var(--text-mut); font-weight: 500; }
+.loc-chip.is-none { color: var(--text-mut); }
+
 /* ---------- CHECKLIST ---------- */
 .check-count { font-size: 13px; font-weight: 700; color: var(--text-mut); }
 .progress {
@@ -95,7 +109,26 @@
   display: flex; align-items: center; gap: 11px;
   padding: 11px 12px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  transition: box-shadow 0.15s ease, background 0.15s ease;
 }
+.check-row.dragging {
+  background: var(--surface-2);
+  box-shadow: var(--elev-shadow), 0 0 0 1px var(--accent-line);
+  position: relative;
+  z-index: 5;
+}
+.drag-handle {
+  width: 34px; height: 34px;
+  flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none; /* la maniglia non fa scrollare la pagina su iPhone */
+  -webkit-user-select: none; user-select: none;
+}
+.drag-handle:active { cursor: grabbing; color: var(--text-mut); }
+body.is-dragging,
+body.is-dragging * { cursor: grabbing !important; -webkit-user-select: none; user-select: none; }
 .check-box {
   width: 26px; height: 26px; flex: none;
   border-radius: 8px;

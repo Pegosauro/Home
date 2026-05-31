@@ -5,6 +5,7 @@
 :root {
   --max-w: 640px;
   --header-h: 56px;
+  --room-hdr-h: 92px;
   --nav-h: 64px;
   --pad: 16px;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -68,6 +69,11 @@
   padding: calc(var(--header-h) + var(--safe-top) + 14px) var(--pad)
            calc(var(--nav-h) + var(--safe-bottom) + 28px);
   min-height: 100dvh;
+}
+
+/* Pagina stanza: l'intestazione colorata è più alta da espansa */
+.view.view--room {
+  padding-top: calc(var(--room-hdr-h) + var(--safe-top) + 16px);
 }
 
 /* Quando header e nav sono nascosti (es. CONFIGURA CASA) */

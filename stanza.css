@@ -2,6 +2,91 @@
    STANZA — pagina dedicata della singola stanza
    ============================================================ */
 
+/* ============================================================
+   INTESTAZIONE COLORATA DELLA STANZA (fusa con la barra, collassabile)
+   ============================================================ */
+.app-header.is-room {
+  height: calc(var(--room-hdr-h) + var(--safe-top));
+  gap: 0;
+  color: #fff;
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--room-color, var(--accent)) 86%, #fff 14%),
+    var(--room-color, var(--accent)));
+  border-bottom-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  overflow: hidden;
+  box-shadow: 0 10px 26px -16px rgba(0, 0, 0, 0.85);
+  transition: height 0.28s cubic-bezier(0.3, 0.8, 0.3, 1), background 0.2s ease;
+}
+.app-header.is-room::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.14));
+  pointer-events: none;
+}
+.app-header.is-room .header-btn {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: transparent;
+  color: #fff;
+  margin-right: 12px;
+  position: relative;
+  z-index: 1;
+}
+.app-header.is-room .header-btn:active { background: rgba(255, 255, 255, 0.30); }
+
+.hdr-room-ico {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  color: #fff;
+  margin-right: 12px;
+  position: relative;
+  z-index: 1;
+  transition: width 0.26s ease, height 0.26s ease, opacity 0.2s ease, margin 0.26s ease;
+}
+.hdr-room-ico .ico { width: 26px; height: 26px; }
+
+.hdr-room-info { position: relative; z-index: 1; min-width: 0; flex: 1; }
+.hdr-room-name {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.12;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: font-size 0.26s ease;
+}
+.hdr-room-floor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.95;
+  margin-top: 2px;
+  max-height: 22px;
+  overflow: hidden;
+  transition: opacity 0.2s ease, max-height 0.26s ease, margin-top 0.2s ease;
+}
+.hdr-room-floor .ico { width: 15px; height: 15px; flex: none; }
+.hdr-room-floor > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Stato compatto (durante lo scroll) */
+.app-header.is-room.is-collapsed { height: calc(var(--header-h) + var(--safe-top)); }
+.app-header.is-room.is-collapsed .hdr-room-ico { width: 0; height: 0; opacity: 0; margin-right: 0; }
+.app-header.is-room.is-collapsed .hdr-room-name { font-size: 18px; }
+.app-header.is-room.is-collapsed .hdr-room-floor { opacity: 0; max-height: 0; margin-top: 0; }
+
 .room-hero {
   display: flex;
   align-items: center;
