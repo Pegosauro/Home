@@ -2,44 +2,37 @@
    HOME — riepilogo, piani/aree, stanze, mappa casa
    ============================================================ */
 
-/* Riepilogo statistiche */
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-.stat {
-  background: linear-gradient(180deg, var(--card-top), transparent 60%), var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 14px 12px;
+/* Striscia "in evidenza" (solo se ci sono lavori scaduti / alta priorità) */
+.home-alert {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 14px;
+  margin-bottom: 20px;
+  text-align: left;
+  border-radius: var(--radius);
+  background: var(--danger-weak);
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, transparent);
   box-shadow: var(--card-inset);
+  transition: transform 0.16s ease, filter 0.16s ease;
 }
-.stat.accent {
-  border-color: var(--accent-line);
-  box-shadow: var(--card-inset), 0 12px 30px -18px var(--accent-glow);
+.home-alert:active { transform: scale(0.99); filter: brightness(1.06); }
+.home-alert-ico { flex: none; display: flex; color: var(--danger); }
+.home-alert-ico .ico { width: 22px; height: 22px; }
+.home-alert-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
 }
-.stat.accent .stat-val { text-shadow: 0 0 18px var(--accent-glow); }
-.stat .stat-val {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-.stat .stat-lbl {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-mut);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.stat.accent .stat-val { color: var(--accent); }
-.stat.alta .stat-val { color: var(--prio-alta); }
-.stat.scaduti .stat-val { color: var(--danger); }
-.stat.fatto .stat-val { color: var(--stato-fatto); }
+.home-alert-chev { flex: none; display: flex; color: var(--danger); opacity: 0.65; }
+.home-alert-chev .ico { width: 18px; height: 18px; }
+
+/* Pillola d'attenzione nelle card stanza */
+.count-pill.is-danger { color: var(--danger); font-weight: 700; }
+.count-pill.room-empty-hint { color: var(--text-faint); font-weight: 600; }
 
 /* Piano/area */
 .floor-group { margin-bottom: 18px; }
@@ -96,7 +89,8 @@
 }
 .room-counts {
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 6px 14px;
   margin-top: 4px;
 }
 .room-chevron { color: var(--text-faint); flex: none; }
