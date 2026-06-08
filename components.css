@@ -106,6 +106,98 @@
   box-shadow: var(--elev-shadow), var(--card-inset), 0 0 0 1px var(--accent-line);
 }
 
+/* Card in trascinamento (ordinamento Manuale) */
+.card.dragging {
+  box-shadow: var(--elev-shadow), 0 8px 24px rgba(0,0,0,0.28), 0 0 0 1px var(--accent-line);
+  position: relative;
+  z-index: 5;
+  cursor: grabbing;
+}
+.card.dragging:active { transform: none; }
+/* Maniglia di trascinamento dentro una card: allineata alla prima riga */
+.card-drag {
+  width: 26px; height: 24px;
+  margin: -2px 2px 0 -4px;
+  align-self: center;
+}
+
+/* ---------------- ORDINA (toolbar + menu) ---------------- */
+/* Riga in cima alla lista: filtro a sinistra + pulsante tondo "Ordina" a destra */
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.list-toolbar .filter-bar { margin-bottom: 0; flex: 1; min-width: 0; }
+.list-toolbar-spacer { flex: 1; }
+.sort-icon-btn {
+  flex: none;
+  width: 46px; height: 46px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.sort-icon-btn .ico { width: 20px; height: 20px; }
+.sort-icon-btn:active { transform: scale(0.94); border-color: var(--accent-line); color: var(--accent); }
+
+.sort-list { display: flex; flex-direction: column; gap: 6px; }
+.sort-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.sort-opt.is-active { border-color: var(--accent-line); background: var(--accent-dim); }
+.sort-opt.is-active .ico { color: var(--accent); }
+.sort-opt-main { display: flex; flex-direction: column; gap: 2px; }
+.sort-opt-hint { font-size: 12px; font-weight: 500; color: var(--text-mut); }
+
+/* ---------------- SEZIONE COMPRIMIBILE (Completati / Archiviate) ---------------- */
+.done-section { margin-top: 18px; }
+.done-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--text-mut);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.done-toggle .ico { width: 16px; height: 16px; transition: transform 0.2s ease; }
+.done-toggle.is-open .ico { transform: rotate(90deg); }
+.done-stack { margin-top: 8px; }
+.done-stack .card { opacity: 0.72; }
+.all-done-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 4px;
+  color: var(--text-mut);
+  font-size: 14px;
+  font-weight: 600;
+}
+.all-done-note .ico { width: 18px; height: 18px; color: var(--success); }
+
 .card-title { font-size: 16px; font-weight: 700; }
 .card-desc {
   font-size: 14px;
@@ -160,6 +252,33 @@
 .badge-stato-in_corso  { color: var(--stato-in_corso);  background: color-mix(in srgb, var(--stato-in_corso) 16%, transparent); }
 .badge-stato-in_attesa { color: var(--stato-in_attesa); background: color-mix(in srgb, var(--stato-in_attesa) 16%, transparent); }
 .badge-stato-fatto     { color: var(--stato-fatto);     background: color-mix(in srgb, var(--stato-fatto) 16%, transparent); }
+
+/* Selettore di stato toccabile (pagina dettaglio lavoro) */
+.detail-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.detail-status-label {
+  font-size: 12.5px; font-weight: 700; color: var(--text-mut);
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.status-switch { display: flex; gap: 7px; flex-wrap: wrap; }
+.status-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 13px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-mut);
+  font-size: 13px; font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.status-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+.status-chip.is-active {
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px currentColor;
+  font-weight: 700;
+}
+.status-chip.is-active .dot { background: currentColor; }
+.status-chip:active { transform: scale(0.96); }
 
 /* Stati idea */
 .badge-idea-bozza       { color: var(--idea-bozza);       background: color-mix(in srgb, var(--idea-bozza) 18%, transparent); }
@@ -540,6 +659,21 @@
 .toast.is-success { color: var(--success); }
 .toast.is-error { color: var(--danger); }
 .toast.is-out { animation: toast-out 0.2s ease forwards; }
+
+/* Toast con azione (es. "Nuova versione disponibile · Aggiorna") */
+.toast.is-action { pointer-events: auto; }
+.toast-btn {
+  margin-left: 4px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.toast-btn:active { filter: brightness(0.92); }
 
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(8px); } }

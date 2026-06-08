@@ -1,9 +1,9 @@
 ========================================
- CASA APP — Istruzioni
- Versione 2.5.0
+ HOME APP — Istruzioni
+ Versione 2.7.0
 ========================================
 
-Casa App è una web app statica (PWA leggera) per gestire lavori di casa,
+Home App è una web app statica (PWA leggera) per gestire lavori di casa,
 stanze, piani/aree e idee progettuali. Funziona sia aprendo index.html in
 locale sia pubblicata su GitHub Pages. I dati restano salvati SOLO sul tuo
 dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
@@ -18,8 +18,20 @@ dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
   (da fare / in corso / in attesa / fatto), filtro per priorità.
   Scadenza facoltativa con badge "Scaduto / Oggi / Tra N gg"; in Home
   il numero di lavori "Scaduti".
+  ORDINAMENTO: il pulsante "Ordina" (in alto a destra) apre un menu per
+  scegliere come disporre i lavori: Manuale, Scadenza, Priorità, Stanza,
+  Aggiunti di recente. La scelta viene ricordata. Con "Manuale" compare
+  una maniglia su ogni card: trascinala per metterli nell'ordine che vuoi.
+  COMPLETATI: i lavori segnati "fatto" escono dalla lista e finiscono in
+  una sezione "Completati (N)" comprimibile in fondo, così la lista resta
+  pulita.
+  STATO RAPIDO: ogni nuovo lavoro parte come "Da fare". Lo stato
+  (Da fare / In corso / In attesa / Fatto) si cambia con un tocco
+  direttamente dalla pagina del lavoro, senza aprire la modifica.
 - IDEE: elenco con stato (bozza / da valutare / approvata / archiviata),
-  link di riferimento e stima costo.
+  link di riferimento e stima costo. Stesso pulsante "Ordina" (Manuale /
+  Stato / Costo / Recenti) con trascinamento in modalità Manuale; le idee
+  "archiviata" finiscono in una sezione "Archiviate (N)" comprimibile.
 - Dettaglio LAVORO/IDEA: titolo completo, CHECKLIST riordinabile
   (trascina la maniglia), e SPESA collegata.
 - Un lavoro/idea può stare su PIÙ STANZE (oppure su nessuna: "Senza stanza").
@@ -27,9 +39,12 @@ dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
   (ferramenta, arredamento, ...), nota per articolo e collegamento opzionale
   a una stanza, a un lavoro o a un'idea. Filtro per categoria. Tocca un
   articolo per modificarlo.
-- OPZIONI: tema chiaro/scuro, colore accento, gestione piani e stanze,
-  diagnostica, esporta/importa JSON, backup automatico su Google Drive,
-  reset dati.
+- OPZIONI: organizzate a menu (tocca una voce per entrare nella sezione):
+    · Aspetto (tema chiaro/scuro, colore accento)
+    · Gestione casa (piani/aree e stanze)
+    · Backup e dati (esporta/importa JSON, backup Google Drive)
+    · Diagnostica (stato dati e reset)
+  La freccia in alto a sinistra riporta al menu Opzioni.
 
 NOTA: la gestione delle STANZE è dentro la gestione dei PIANI/AREE
 (Opzioni -> Gestione piani/aree -> tocca un piano -> aggiungi/gestisci
@@ -46,6 +61,7 @@ le sue stanze).
    File da caricare (tutti allo stesso livello):
      - index.html
      - app.js
+     - sw.js
      - manifest.json
      - base.css
      - layout.css
@@ -87,31 +103,44 @@ Se carichi uno ZIP, estrailo prima (es. con l'app File di iPhone) e poi
 carica i file estratti, NON lo ZIP.
 
 ----------------------------------------
- 3. FORZARE L'AGGIORNAMENTO (?v=2)
+ 3. AGGIORNAMENTI E OFFLINE (automatici)
 ----------------------------------------
 
-Se dopo un aggiornamento il browser mostra ancora la versione vecchia,
-aggiungi un parametro alla fine dell'indirizzo per "ingannare" la cache:
+Da questa versione l'app usa un "service worker" che le permette di:
+  - APRIRSI ANCHE SENZA RETE (offline): i file restano salvati sul
+    dispositivo, così l'app parte anche in metropolitana o senza dati.
+  - AGGIORNARSI DA SOLA: quando sei online prende sempre l'ultima
+    versione pubblicata. Non serve più il vecchio trucco "?v=2".
 
-       https://TUONOME.github.io/NOMEREPO/index.html?v=2
+Quando esce una nuova versione, in basso compare l'avviso
+"Nuova versione disponibile" con il pulsante "Aggiorna": premilo e
+l'app si ricarica già aggiornata. I tuoi dati NON vengono toccati.
 
-Cambia il numero ogni volta che vuoi forzare il ricaricamento:
-?v=3, ?v=4, e così via.
+PER CHI PUBBLICA: a ogni rilascio cambia la riga
+   var CACHE_VERSION = "casa-app-2.7.0";
+in cima al file sw.js (es. "casa-app-2.7.1"). È questo cambio che fa
+scattare l'avviso di aggiornamento sui dispositivi. Ricordati di
+caricare ANCHE sw.js insieme agli altri file su GitHub Pages.
+
+Se proprio vuoi forzare un ricaricamento "manuale" puoi ancora
+aggiungere ?v=2 (poi ?v=3, ?v=4...) in fondo all'indirizzo, ma di
+norma non serve più.
 
 ----------------------------------------
  4. SAFARI IPHONE MOSTRA UNA VECCHIA VERSIONE
 ----------------------------------------
 
-Prova in quest'ordine:
-  1. Apri l'indirizzo con ?v=2 (vedi punto 3), cambiando il numero.
-  2. Tira la pagina verso il basso per ricaricare.
-  3. Chiudi del tutto la scheda e riaprila.
+Di norma basta premere "Aggiorna" quando compare l'avviso di nuova
+versione (vedi punto 3). Se ancora vedi una versione vecchia, prova:
+  1. Tira la pagina verso il basso per ricaricare.
+  2. Chiudi del tutto la scheda e riaprila.
+  3. Apri l'indirizzo con ?v=2 (vedi punto 3), cambiando il numero.
   4. Impostazioni iPhone -> Safari -> "Cancella dati siti web e cronologia"
      (ATTENZIONE: questo può cancellare i dati salvati di altri siti).
 
-NOTA: questa versione NON usa service worker né cache offline, quindi i
-problemi di cache sono ridotti al minimo. La cache offline potrà essere
-aggiunta in futuro, quando l'app sarà stabile.
+NOTA: questa versione USA un service worker per funzionare offline e per
+aggiornarsi da sola (vedi punto 3). La strategia è "prima la rete": online
+prendi sempre l'ultima versione, offline parti dalla copia salvata.
 
 ----------------------------------------
  5. ESPORTARE E IMPORTARE I DATI (JSON)
@@ -161,7 +190,7 @@ su iCloud Drive da una web app. OneDrive sarebbe possibile ma non incluso.
 Serve un "Client ID" di Google. Lo crei col tuo account così:
 
   1. Vai su  https://console.cloud.google.com  e crea un progetto
-     (es. "Casa App").
+     (es. "Home App").
   2. API e servizi -> Libreria -> cerca "Google Drive API" -> Abilita.
   3. API e servizi -> Schermata consenso OAuth:
        - Tipo utente: Esterno.
@@ -217,9 +246,19 @@ Serve un "Client ID" di Google. Lo crei col tuo account così:
     fai login lì e l'app si aggiorna da sola, senza ricaricare. Se il
     dispositivo blocca i popup, l'app passa automaticamente al metodo a
     pagina intera (redirect).
-  - Il backup è "a senso unico verso il cloud": su un secondo dispositivo
-    fai una volta "Ripristina da Drive" per allinearti. Se modifichi su
-    due dispositivi, vince l'ultimo che ha salvato.
+  - CONFRONTO AUTOMATICO: all'avvio e al collegamento, l'app confronta
+    i dati locali con il backup su Drive. Se sul cloud c'è una versione
+    PIÙ RECENTE (es. modificata su un altro dispositivo), te lo dice e
+    ti chiede se vuoi caricarla ("Carica dal cloud"). Niente viene
+    sovrascritto senza la tua conferma. Se invece è più aggiornato il
+    dispositivo, l'app riallinea il cloud da sola (se l'auto-backup è
+    attivo). Questo evita di perdere dati per sbaglio.
+  - In OPZIONI, sotto "Backup cloud", la voce "Sincronizzazione" mostra
+    se il backup è "Allineato" o se ci sono modifiche ancora da salvare.
+  - Resta valido il principio "vince l'ultimo che salva": se modifichi
+    in contemporanea su due dispositivi senza sincronizzare, l'ultimo
+    backup sovrascrive il precedente. Il confronto automatico serve
+    proprio a segnalartelo prima.
   - Il file "casa-app-backup.json" è visibile nel Drive dell'utente: lo
     si recupera dall'app con "Ripristina", ma volendo si può anche
     scaricare a mano da Google Drive.
@@ -248,5 +287,5 @@ chiave di salvataggio e data dell'ultimo aggiornamento. Utile per
 controllare al volo cosa c'è salvato sul dispositivo.
 
 ========================================
- Buon lavoro con Casa App!
+ Buon lavoro con Home App!
 ========================================

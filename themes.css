@@ -5,7 +5,7 @@
    ============================================================ */
 
 :root {
-  /* Accento (sovrascritto da JS). Default blu Casa App. */
+  /* Accento (sovrascritto da JS). Default blu Home App. */
   --accent: #218bff;
   --accent-weak: rgba(33, 139, 255, 0.14);
   --accent-text: #ffffff;

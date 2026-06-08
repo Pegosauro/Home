@@ -1,5 +1,5 @@
 /* ============================================================
-   CASA APP — app.js
+   HOME APP — app.js
    JavaScript vanilla, nessun import/export, nessuna libreria.
    Gestione click centralizzata (event delegation) per Safari iPhone.
    ============================================================ */
@@ -11,7 +11,7 @@
      ========================================================== */
   var CONFIG = {
     STORAGE_KEY: "casa-app-v2-data",
-    VERSION: "2.5.0",
+    VERSION: "2.7.0",
     DEFAULT_ACCENT: "#218bff",
     ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
     ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"],
@@ -54,6 +54,33 @@
   var PRIO_RANK = { alta: 0, media: 1, bassa: 2 };
   var STATUS_LABEL = { da_fare: "Da fare", in_corso: "In corso", in_attesa: "In attesa", fatto: "Fatto" };
   var IDEA_LABEL = { bozza: "Bozza", da_valutare: "Da valutare", approvata: "Approvata", archiviata: "Archiviata" };
+  var IDEA_RANK = { approvata: 0, da_valutare: 1, bozza: 2, archiviata: 3 };
+
+  // Modalità di ordinamento (chiave + etichetta). "manuale" sblocca il drag&drop.
+  var TASK_SORTS = [
+    ["manuale", "Manuale"],
+    ["scadenza", "Scadenza"],
+    ["priorita", "Priorità"],
+    ["stanza", "Stanza"],
+    ["recenti", "Aggiunti di recente"]
+  ];
+  var IDEA_SORTS = [
+    ["manuale", "Manuale"],
+    ["stato", "Stato"],
+    ["costo", "Costo"],
+    ["recenti", "Aggiunti di recente"]
+  ];
+  // Sotto-sezioni della pagina Opzioni (menu ad albero). Chiave = #opzioni/<chiave>.
+  var OPT_SECTIONS = { aspetto: "Aspetto", backup: "Backup e dati", diagnostica: "Diagnostica" };
+
+  function sortLabel(sorts, key) {
+    for (var i = 0; i < sorts.length; i++) if (sorts[i][0] === key) return sorts[i][1];
+    return sorts[0][1];
+  }
+  function hasSort(sorts, key) {
+    for (var i = 0; i < sorts.length; i++) if (sorts[i][0] === key) return true;
+    return false;
+  }
 
   // Icone SVG inline (inner markup, viewBox 0 0 24 24)
   var ICONS = {
@@ -87,6 +114,7 @@
     listcheck: '<path d="M11 6h10"/><path d="M11 12h10"/><path d="M11 18h10"/><path d="M3 6.5 4.2 7.7 6.5 5"/><path d="M3 12.5 4.2 13.7 6.5 11"/><path d="M3 18.5 4.2 19.7 6.5 17"/>',
     extlink: '<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
     grip: '<path d="M8 7h8"/><path d="M8 12h8"/><path d="M8 17h8"/>',
+    sort: '<path d="M7 4v16"/><path d="M4 8l3-4 3 4"/><path d="M17 20V4"/><path d="M14 16l3 4 3-4"/>',
     calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v3"/><path d="M16 3v3"/>',
     bag: '<path d="M6 8h12l-.8 11.1a2 2 0 0 1-2 1.9H8.8a2 2 0 0 1-2-1.9L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
     coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.9-2.5 2s1.1 2 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2c-1 0-2-.4-2.5-1.2"/><path d="M12 6.5v11"/>',
@@ -118,7 +146,9 @@
     shopFilter: "tutte",   // filtro categoria sezione SPESA
     currentTaskId: null,   // lavoro aperto nella pagina dettaglio
     currentIdeaId: null,   // idea aperta nella pagina dettaglio
-    manageFloorId: null    // piano in gestione (drill-down stanze in Opzioni)
+    manageFloorId: null,   // piano in gestione (drill-down stanze in Opzioni)
+    doneOpen: false,       // sezione "Completati" (Lavori) espansa
+    archOpen: false        // sezione "Archiviate" (Idee) espansa
   };
 
   var pendingConfirm = null; // callback conferma azione distruttiva
@@ -161,7 +191,7 @@
     var iso = nowISO();
     return {
       version: CONFIG.VERSION,
-      settings: { theme: "dark", accentColor: CONFIG.DEFAULT_ACCENT, compactMode: false },
+      settings: { theme: "dark", accentColor: CONFIG.DEFAULT_ACCENT, compactMode: false, taskSort: "priorita", ideaSort: "recenti" },
       house: { floors: [], rooms: [] },
       tasks: [],
       ideas: [],
@@ -179,6 +209,8 @@
       d.settings.theme = obj.settings.theme === "light" ? "light" : "dark";
       d.settings.accentColor = isHex(obj.settings.accentColor) ? obj.settings.accentColor : CONFIG.DEFAULT_ACCENT;
       d.settings.compactMode = !!obj.settings.compactMode;
+      if (hasSort(TASK_SORTS, obj.settings.taskSort)) d.settings.taskSort = obj.settings.taskSort;
+      if (hasSort(IDEA_SORTS, obj.settings.ideaSort)) d.settings.ideaSort = obj.settings.ideaSort;
     }
     if (obj.house && typeof obj.house === "object") {
       d.house.floors = Array.isArray(obj.house.floors) ? obj.house.floors : [];
@@ -194,19 +226,23 @@
       ids.forEach(function (id) { if (validRoom[id] && !seen[id]) { seen[id] = true; out.push(id); } });
       return out;
     }
-    d.tasks = (Array.isArray(obj.tasks) ? obj.tasks : []).map(function (t) {
+    d.tasks = (Array.isArray(obj.tasks) ? obj.tasks : []).map(function (t, idx) {
       t.roomIds = migrateRoomIds(t);
       delete t.roomId;
       t.dueDate = typeof t.dueDate === "string" ? t.dueDate : "";
       t.checklist = Array.isArray(t.checklist) ? t.checklist : [];
+      // order: posizione per l'ordinamento "Manuale". Se assente, usa l'indice
+      // (così l'ordine attuale resta stabile finché non si trascina a mano).
+      t.order = typeof t.order === "number" ? t.order : idx;
       return t;
     });
-    d.ideas = (Array.isArray(obj.ideas) ? obj.ideas : []).map(function (i) {
+    d.ideas = (Array.isArray(obj.ideas) ? obj.ideas : []).map(function (i, idx) {
       i.roomIds = migrateRoomIds(i);
       delete i.roomId;
       i.checklist = Array.isArray(i.checklist) ? i.checklist : [];
       i.link = typeof i.link === "string" ? i.link : "";
       i.cost = typeof i.cost === "string" ? i.cost : (i.cost != null ? String(i.cost) : "");
+      i.order = typeof i.order === "number" ? i.order : idx;
       return i;
     });
     d.shopping = (Array.isArray(obj.shopping) ? obj.shopping : []).map(function (s) {
@@ -242,13 +278,19 @@
       notes: opts.notes || ""
     };
   }
+  // Posizione "Manuale" per un nuovo elemento: in fondo alla lista esistente.
+  function nextOrder(list) {
+    var m = -1;
+    (list || []).forEach(function (x) { if (typeof x.order === "number" && x.order > m) m = x.order; });
+    return m + 1;
+  }
   function createTask(d) {
     var iso = nowISO();
     return {
       id: uid("task"), roomIds: Array.isArray(d.roomIds) ? d.roomIds : [], title: d.title, description: d.description || "",
       priority: d.priority || "media", status: d.status || "da_fare",
       dueDate: d.dueDate || "",
-      checklist: [],
+      checklist: [], order: nextOrder(state.data && state.data.tasks),
       createdAt: iso, updatedAt: iso, completedAt: d.status === "fatto" ? iso : null
     };
   }
@@ -268,7 +310,8 @@
     return {
       id: uid("idea"), roomIds: Array.isArray(d.roomIds) ? d.roomIds : [], title: d.title, description: d.description || "",
       status: d.status || "bozza", link: d.link || "", cost: d.cost || "",
-      checklist: [], createdAt: iso, updatedAt: iso
+      checklist: [], order: nextOrder(state.data && state.data.ideas),
+      createdAt: iso, updatedAt: iso
     };
   }
 
@@ -298,6 +341,86 @@
     var ao = a.order || 0, bo = b.order || 0;
     if (ao !== bo) return ao - bo;
     return String(a.name).localeCompare(String(b.name), "it");
+  }
+
+  /* --- ordinamento liste (Lavori / Idee) --- */
+  function taskSort() { return (state.data.settings && state.data.settings.taskSort) || "priorita"; }
+  function ideaSort() { return (state.data.settings && state.data.settings.ideaSort) || "recenti"; }
+  function setSort(kind, key) {
+    if (kind === "task") state.data.settings.taskSort = key;
+    else state.data.settings.ideaSort = key;
+    persist();
+  }
+
+  function byManual(a, b) {
+    var r = (a.order || 0) - (b.order || 0);
+    return r || String(a.createdAt).localeCompare(String(b.createdAt));
+  }
+  function byCreatedDesc(a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); }
+  function byPrio(a, b) {
+    var r = PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
+    return r || byCreatedDesc(a, b);
+  }
+  function byDue(a, b) {
+    var da = a.dueDate || "", db = b.dueDate || "";
+    if (da && db) { if (da !== db) return da < db ? -1 : 1; }
+    else if (da) return -1;   // con scadenza prima
+    else if (db) return 1;    // senza scadenza in fondo
+    return byPrio(a, b);
+  }
+  function roomSortKey(t) {
+    var rid = (t.roomIds || [])[0];
+    if (!rid) return "￿";  // "Senza stanza" in fondo
+    var r = findRoom(rid);
+    return r ? (floorNameOf(r.floorId) + " " + r.name).toLowerCase() : "￿";
+  }
+  function byRoom(a, b) {
+    var r = roomSortKey(a).localeCompare(roomSortKey(b), "it");
+    return r || byPrio(a, b);
+  }
+  function costNum(s) {
+    var m = String(s == null ? "" : s).replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
+    var n = parseFloat(m);
+    return isNaN(n) ? -1 : n;
+  }
+  function byCostDesc(a, b) {
+    var r = costNum(b.cost) - costNum(a.cost);
+    return r || byCreatedDesc(a, b);
+  }
+  function byIdeaStatus(a, b) {
+    var r = IDEA_RANK[a.status] - IDEA_RANK[b.status];
+    return r || byCreatedDesc(a, b);
+  }
+
+  function sortTasks(list, mode) {
+    var cmp = mode === "manuale" ? byManual
+      : mode === "scadenza" ? byDue
+      : mode === "stanza" ? byRoom
+      : mode === "recenti" ? byCreatedDesc
+      : byPrio;
+    return list.slice().sort(cmp);
+  }
+  function sortIdeas(list, mode) {
+    var cmp = mode === "manuale" ? byManual
+      : mode === "stato" ? byIdeaStatus
+      : mode === "costo" ? byCostDesc
+      : byCreatedDesc;
+    return list.slice().sort(cmp);
+  }
+
+  // Riassegna il campo "order" agli elementi trascinati (visibili) riusando gli
+  // slot di posizione che occupavano: non disturba gli elementi non mostrati
+  // (es. nascosti da un filtro priorità) e mantiene gli order distinti.
+  function commitManualOrder(list, ids) {
+    var byId = {};
+    list.forEach(function (x) { byId[x.id] = x; });
+    var moved = [];
+    ids.forEach(function (id) { if (byId[id]) moved.push(byId[id]); });
+    if (!moved.length) return;
+    var slots = moved.map(function (x) { return (typeof x.order === "number" ? x.order : 0); })
+      .sort(function (a, b) { return a - b; });
+    moved.forEach(function (x, i) { x.order = slots[i]; x.updatedAt = nowISO(); });
+    persist();
   }
 
   // --- mutazioni con cascata ---
@@ -352,7 +475,8 @@
     if (parts[0] === "stanza") return { name: "stanza", param: parts[1] || "" };
     if (parts[0] === "lavoro") return { name: "lavoro", param: parts[1] || "" };
     if (parts[0] === "idea") return { name: "idea", param: parts[1] || "" };
-    if (parts[0] === "lavori" || parts[0] === "idee" || parts[0] === "spesa" || parts[0] === "opzioni" || parts[0] === "home") {
+    if (parts[0] === "opzioni") return { name: "opzioni", param: parts[1] || "" };
+    if (parts[0] === "lavori" || parts[0] === "idee" || parts[0] === "spesa" || parts[0] === "home") {
       return { name: parts[0] };
     }
     return { name: "home" };
@@ -411,7 +535,7 @@
       case "lavori": body = viewLavori(); break;
       case "idee": body = viewIdee(); break;
       case "spesa": body = viewSpesa(); break;
-      case "opzioni": body = viewOpzioni(); break;
+      case "opzioni": body = viewOpzioni(route.param); break;
       case "stanza": body = viewStanza(route.param); break;
       case "lavoro": body = viewTaskDetail(route.param); break;
       case "idea": body = viewIdeaDetail(route.param); break;
@@ -628,6 +752,10 @@
       var idd = findIdea(route.param);
       return slimHeaderHtml("back-idea", idd ? idd.title : "Idea");
     }
+    // Sotto-sezione di Opzioni: header con freccia indietro al menu Opzioni.
+    if (route.name === "opzioni" && route.param) {
+      return slimHeaderHtml("opzioni-root", OPT_SECTIONS[route.param] || "Opzioni");
+    }
     var titles = { home: "Home App", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
     return '<div class="grow"><div class="header-title">' + titles[route.name] + "</div></div>";
   }
@@ -808,24 +936,55 @@
         return '<button class="seg-btn' + (filt === s[0] ? " is-active" : "") + '" data-action="filter-prio" data-prio="' + s[0] + '">' + s[1] + "</button>";
       }).join("") + "</div>";
 
-    return seg + '<div id="lavori-list">' + lavoriListHtml() + "</div>" + fab("add-task", "Aggiungi lavoro");
+    return listToolbar(seg, "task") + '<div id="lavori-list">' + lavoriListHtml() + "</div>" + fab("add-task", "Aggiungi lavoro");
+  }
+
+  // Barra di una lista: filtro (se presente) a sinistra + pulsante tondo "Ordina"
+  // a destra (sola icona, apre il menu dal basso). Niente testo → niente spazio sprecato.
+  function listToolbar(filterHtml, kind) {
+    return '<div class="list-toolbar">' +
+      (filterHtml || '<span class="list-toolbar-spacer"></span>') +
+      '<button class="sort-icon-btn" data-action="open-sort" data-kind="' + kind + '" aria-label="Ordina">' +
+        svg("sort") +
+      "</button>" +
+    "</div>";
   }
 
   // Solo il corpo della lista Lavori (filtrato/ordinato): usato sia al primo
   // render sia per l'aggiornamento mirato al cambio filtro (senza ridisegnare la barra).
   function lavoriListHtml() {
     var filt = state.filterPrio;
-    var list = state.data.tasks.slice();
-    if (filt !== "tutti") list = list.filter(function (t) { return t.priority === filt; });
-    list.sort(function (a, b) {
-      if (PRIO_RANK[a.priority] !== PRIO_RANK[b.priority]) return PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
-      return String(b.createdAt).localeCompare(String(a.createdAt));
-    });
-    return list.length
-      ? '<div class="stack">' + list.map(taskCard).join("") + "</div>"
-      : emptyState("tasks", "Nessun lavoro", filt === "tutti"
-          ? "Aggiungi il primo lavoro con il pulsante +."
-          : "Nessun lavoro con questa priorità.");
+    var all = state.data.tasks.slice();
+    if (filt !== "tutti") all = all.filter(function (t) { return t.priority === filt; });
+    var mode = taskSort();
+    var manual = mode === "manuale";
+    var active = sortTasks(all.filter(function (t) { return t.status !== "fatto"; }), mode);
+    var done = all.filter(function (t) { return t.status === "fatto"; })
+      .sort(function (a, b) { return String(b.completedAt || b.updatedAt).localeCompare(String(a.completedAt || a.updatedAt)); });
+
+    var body;
+    if (active.length) {
+      body = '<div class="stack reorder-list" data-reorder="task">' +
+        active.map(function (t) { return taskCard(t, manual && active.length > 1); }).join("") + "</div>";
+    } else if (done.length) {
+      body = '<div class="all-done-note">' + svg("check", "ico-sm") + "Tutti i lavori sono completati 🎉</div>";
+    } else {
+      body = emptyState("tasks", "Nessun lavoro", filt === "tutti"
+        ? "Aggiungi il primo lavoro con il pulsante +."
+        : "Nessun lavoro con questa priorità.");
+    }
+    return body + collapsibleDone("done", state.doneOpen, "Completati", done, function (t) { return taskCard(t, false); });
+  }
+
+  // Sezione comprimibile in fondo (Completati / Archiviate).
+  function collapsibleDone(toggleAction, open, label, items, cardFn) {
+    if (!items.length) return "";
+    return '<div class="done-section">' +
+      '<button class="done-toggle' + (open ? " is-open" : "") + '" data-action="toggle-' + toggleAction + '">' +
+        svg("chevron", "ico-sm") + '<span>' + label + " (" + items.length + ")</span>" +
+      "</button>" +
+      (open ? '<div class="stack done-stack">' + items.map(cardFn).join("") + "</div>" : "") +
+      "</div>";
   }
 
   // Aggiorna solo la lista (la barra resta viva → il rimbalzo del thumb non viene
@@ -838,7 +997,13 @@
     window.scrollTo(0, 0);
   }
 
-  function taskCard(t) {
+  // Maniglia di trascinamento per le card (visibile solo in ordinamento "Manuale").
+  // Ha un proprio data-action no-op così il tocco non apre il dettaglio.
+  function dragHandleHtml() {
+    return '<button class="drag-handle card-drag" type="button" data-action="reorder-handle" aria-label="Trascina per riordinare">' + svg("grip") + "</button>";
+  }
+
+  function taskCard(t, draggable) {
     var chk = t.checklist || [];
     var doneN = chk.filter(function (c) { return c.done; }).length;
     var chkPill = chk.length
@@ -848,8 +1013,9 @@
     var shopPill = shop.length
       ? '<span class="count-pill">' + svg("cart", "ico-sm") + shop.filter(function (s) { return !s.done; }).length + "/" + shop.length + "</span>"
       : "";
-    return '<div class="card card-tap task-card prio-' + t.priority + '" data-action="open-task" data-id="' + t.id + '">' +
+    return '<div class="card card-tap task-card prio-' + t.priority + (draggable ? " is-reorderable" : "") + '" data-action="open-task" data-id="' + t.id + '">' +
       '<div class="task-top">' +
+        (draggable ? dragHandleHtml() : "") +
         '<span class="task-title' + (t.status === "fatto" ? " is-done" : "") + '">' + h(t.title) + "</span>" +
         '<div class="task-actions">' +
           iconBtn("edit-task", t.id, "pencil", "Modifica lavoro") +
@@ -863,16 +1029,26 @@
 
   // ---------- IDEE ----------
   function viewIdee() {
-    var list = state.data.ideas.slice().sort(function (a, b) {
-      return String(b.createdAt).localeCompare(String(a.createdAt));
-    });
-    var body = list.length
-      ? '<div class="stack">' + list.map(ideaCard).join("") + "</div>"
-      : emptyState("bulb", "Nessuna idea", "Annota la tua prima idea progettuale con il pulsante +.");
-    return body + fab("add-idea", "Aggiungi idea");
+    var all = state.data.ideas.slice();
+    var mode = ideaSort();
+    var manual = mode === "manuale";
+    var active = sortIdeas(all.filter(function (i) { return i.status !== "archiviata"; }), mode);
+    var arch = all.filter(function (i) { return i.status === "archiviata"; }).sort(byCreatedDesc);
+
+    var body;
+    if (active.length) {
+      body = '<div class="stack reorder-list" data-reorder="idea">' +
+        active.map(function (i) { return ideaCard(i, manual && active.length > 1); }).join("") + "</div>";
+    } else if (arch.length) {
+      body = '<div class="all-done-note">' + svg("check", "ico-sm") + "Tutte le idee sono archiviate.</div>";
+    } else {
+      body = emptyState("bulb", "Nessuna idea", "Annota la tua prima idea progettuale con il pulsante +.");
+    }
+    var archHtml = collapsibleDone("arch", state.archOpen, "Archiviate", arch, function (i) { return ideaCard(i, false); });
+    return listToolbar("", "idea") + body + archHtml + fab("add-idea", "Aggiungi idea");
   }
 
-  function ideaCard(i) {
+  function ideaCard(i, draggable) {
     var shop = shoppingLinkedTo("idea", i.id);
     var shopPill = shop.length
       ? '<span class="count-pill">' + svg("cart", "ico-sm") + shop.filter(function (s) { return !s.done; }).length + "/" + shop.length + "</span>"
@@ -882,8 +1058,9 @@
       ? '<span class="count-pill">' + svg("listcheck", "ico-sm") + clist.filter(function (c) { return c.done; }).length + "/" + clist.length + "</span>"
       : "";
     var costBadge = i.cost ? '<span class="badge badge-soft idea-cost">' + svg("coin", "ico-sm") + h(i.cost) + "</span>" : "";
-    return '<div class="card card-tap idea-card" data-action="open-idea" data-id="' + i.id + '">' +
+    return '<div class="card card-tap idea-card' + (draggable ? " is-reorderable" : "") + '" data-action="open-idea" data-id="' + i.id + '">' +
       '<div class="idea-top">' +
+        (draggable ? dragHandleHtml() : "") +
         '<span class="idea-title">' + h(i.title) + "</span>" +
         '<div class="idea-actions">' +
           iconBtn("edit-idea", i.id, "pencil", "Modifica idea") +
@@ -954,7 +1131,11 @@
           "</div>" +
         "</div>" +
         locChipsHtml(t.roomIds) +
-        '<div class="task-badges">' + (done ? "" : prioBadge(t.priority)) + statusBadge(t.status) + dueBadgeHtml(t) + "</div>" +
+        '<div class="task-badges">' + (done ? "" : prioBadge(t.priority)) + dueBadgeHtml(t) + "</div>" +
+        '<div class="detail-status">' +
+          '<span class="detail-status-label">Stato</span>' +
+          taskStatusSwitcher(t) +
+        "</div>" +
         (t.description ? '<p class="detail-desc">' + h(t.description) + "</p>" : "") +
       "</div>";
 
@@ -965,6 +1146,19 @@
       '<section class="section">' +
         shoppingLinkedBlock("task", t.id) +
       "</section>";
+  }
+
+  // Selettore di stato del lavoro, toccabile dalla pagina di dettaglio
+  // (cambio rapido senza aprire il menu di modifica).
+  function taskStatusSwitcher(t) {
+    var opts = ["da_fare", "in_corso", "in_attesa", "fatto"];
+    return '<div class="status-switch" role="group" aria-label="Stato del lavoro">' +
+      opts.map(function (s) {
+        var on = t.status === s;
+        return '<button class="status-chip' + (on ? " is-active badge-stato-" + s : "") + '" ' +
+          'data-action="set-task-status" data-id="' + t.id + '" data-status="' + s + '" aria-pressed="' + on + '">' +
+          '<span class="dot"></span>' + STATUS_LABEL[s] + "</button>";
+      }).join("") + "</div>";
   }
 
   function checklistBlock(items, title, emptyText) {
@@ -1196,38 +1390,42 @@
   }
 
   // ---------- OPZIONI ----------
-  function viewOpzioni() {
-    var s = state.data.settings;
-    var d = state.data;
+  // Router della pagina Opzioni: menu principale + sotto-sezioni (menu ad albero).
+  function viewOpzioni(section) {
+    if (section === "aspetto") return optSectionAspetto();
+    if (section === "backup") return optSectionBackup();
+    if (section === "diagnostica") return optSectionDiagnostica();
+    return optMenuRoot();
+  }
 
+  // Menu principale: solo le categorie, ognuna apre la propria pagina.
+  function optMenuRoot() {
+    var d = state.data;
+    return '<div class="opt-group opt-menu">' +
+        optSectionRow("aspetto", "palette", "Aspetto", "Tema e colore accento") +
+        optRow("manage-floors", "layers", "Gestione casa", d.house.floors.length + " piani · " + d.house.rooms.length + " stanze") +
+        optSectionRow("backup", "cloud", "Backup e dati", "Esporta/importa e Google Drive") +
+        optSectionRow("diagnostica", "info", "Diagnostica", "Stato dei dati e reset") +
+      "</div>" +
+      '<p class="opt-version">Home App · versione ' + h(d.version) + "</p>";
+  }
+
+  // Riga che apre una sotto-sezione (#opzioni/<section>).
+  function optSectionRow(section, icon, label, sub) {
+    return '<button class="opt-row" data-action="go-opt" data-section="' + section + '">' +
+      '<span class="opt-ico">' + svg(icon) + "</span>" +
+      '<span class="opt-main"><span class="opt-label">' + label + "</span>" +
+      '<span class="opt-sub">' + sub + "</span></span>" +
+      '<span class="opt-trail">' + svg("chevron") + "</span></button>";
+  }
+
+  function optSectionAspetto() {
+    var s = state.data.settings;
     var accentSwatches = CONFIG.ACCENTS.map(function (c) {
       return '<button class="color-opt' + (sameHex(c, s.accentColor) ? " is-active" : "") +
         '" data-action="set-accent" data-color="' + c + '" style="background:' + c + '" aria-label="Accento ' + c + '"></button>';
     }).join("");
-
-    var diag =
-      '<div class="diag">' +
-        diagRow("Versione app", d.version) +
-        diagRow("Piani / aree", String(d.house.floors.length)) +
-        diagRow("Stanze", String(d.house.rooms.length)) +
-        diagRow("Lavori", String(d.tasks.length)) +
-        diagRow("Idee", String(d.ideas.length)) +
-        diagRow("Voci spesa", String(d.shopping.length)) +
-        diagRow("Chiave storage", CONFIG.STORAGE_KEY) +
-        diagRow("Ultimo agg.", formatDateTime(d.updatedAt)) +
-      "</div>";
-
-    return '' +
-      '<div class="opt-group">' +
-        '<div class="opt-group-title">Dati</div>' +
-        optRow("export-json", "download", "Esporta JSON", "Scarica un backup dei dati") +
-        optRow("import-json", "upload", "Importa JSON", "Ripristina da un file di backup") +
-      "</div>" +
-
-      cloudOptGroup() +
-
-      '<div class="opt-group">' +
-        '<div class="opt-group-title">Aspetto</div>' +
+    return '<div class="opt-group">' +
         '<button class="opt-row" data-action="toggle-theme">' +
           '<span class="opt-ico">' + svg(s.theme === "light" ? "sun" : "moon") + "</span>" +
           '<span class="opt-main"><span class="opt-label">Tema ' + (s.theme === "light" ? "chiaro" : "scuro") + "</span>" +
@@ -1238,17 +1436,30 @@
           '<div class="accent-label">Colore accento</div>' +
           '<div class="color-picker">' + accentSwatches + "</div>" +
         "</div>" +
+      "</div>";
+  }
+
+  function optSectionBackup() {
+    return '<div class="opt-group">' +
+        '<div class="opt-group-title">File JSON</div>' +
+        optRow("export-json", "download", "Esporta JSON", "Scarica un backup dei dati") +
+        optRow("import-json", "upload", "Importa JSON", "Ripristina da un file di backup") +
       "</div>" +
+      cloudOptGroup();
+  }
 
-      '<div class="opt-group">' +
-        '<div class="opt-group-title">Gestione casa</div>' +
-        optRow("manage-floors", "layers", "Gestione piani / aree", d.house.floors.length + " piani · " + d.house.rooms.length + " stanze") +
+  function optSectionDiagnostica() {
+    var d = state.data;
+    return '<div class="diag">' +
+        diagRow("Versione app", d.version) +
+        diagRow("Piani / aree", String(d.house.floors.length)) +
+        diagRow("Stanze", String(d.house.rooms.length)) +
+        diagRow("Lavori", String(d.tasks.length)) +
+        diagRow("Idee", String(d.ideas.length)) +
+        diagRow("Voci spesa", String(d.shopping.length)) +
+        diagRow("Chiave storage", CONFIG.STORAGE_KEY) +
+        diagRow("Ultimo agg.", formatDateTime(d.updatedAt)) +
       "</div>" +
-
-      '<div class="opt-group">' +
-        '<div class="opt-group-title">Diagnostica</div>' +
-      "</div>" + diag +
-
       '<div class="opt-group" style="margin-top:16px">' +
         '<div class="opt-group-title">Zona pericolosa</div>' +
         '<button class="opt-row is-danger" data-action="reset-data">' +
@@ -1311,6 +1522,9 @@
       '<div class="diag">' +
         diagRow("Stato", "Connesso") +
         diagRow("Ultimo backup cloud", last ? formatDateTime(last) : "mai") +
+        '<div class="diag-row"><span class="dg-key">Sincronizzazione</span>' +
+          '<span class="dg-val" style="color:' + (gdInSync() ? "var(--success)" : "var(--warning,#f5a623)") + '">' +
+          (gdInSync() ? "✓ Allineato" : "In attesa di backup…") + "</span></div>" +
       "</div>";
     html += "</div>";
     return html;
@@ -1347,10 +1561,8 @@
         field("Titolo", '<input class="input" type="text" name="title" maxlength="80" autocomplete="off" placeholder="Es. Riparare rubinetto" value="' + h(task ? task.title : "") + '" />') +
         '<div class="field"><label>Stanze</label>' + roomChipsSelector(sel) +
           '<div class="field-hint">Tocca per assegnare a una o più stanze (facoltativo).</div></div>' +
-        '<div class="field-row">' +
-          field("Priorità", select("priority", optionsFrom(PRIO_LABEL, task ? task.priority : "media"))) +
-          field("Stato", select("status", optionsFrom(STATUS_LABEL, task ? task.status : "da_fare"))) +
-        "</div>" +
+        field("Priorità", select("priority", optionsFrom(PRIO_LABEL, task ? task.priority : "media"))) +
+        (isEdit ? "" : '<div class="field-hint" style="margin-top:-4px">Il nuovo lavoro parte come <strong>Da fare</strong>. Lo stato si cambia poi dalla pagina del lavoro.</div>') +
         '<div class="field"><label>Scadenza (facoltativa)</label>' +
           '<div class="due-field">' +
             '<input class="input" type="date" name="dueDate" value="' + h(task ? task.dueDate : "") + '" />' +
@@ -1518,6 +1730,24 @@
     openModal(inner);
   }
 
+  // Menu a comparsa dal basso per scegliere l'ordinamento (lavori o idee).
+  function openSortSheet(kind) {
+    var sorts = kind === "task" ? TASK_SORTS : IDEA_SORTS;
+    var cur = kind === "task" ? taskSort() : ideaSort();
+    var rows = sorts.map(function (s) {
+      var on = s[0] === cur;
+      var hint = s[0] === "manuale" ? '<span class="sort-opt-hint">trascina le card per ordinarle</span>' : "";
+      return '<button class="sort-opt' + (on ? " is-active" : "") + '" data-action="set-sort" data-kind="' + kind + '" data-sort="' + s[0] + '">' +
+        '<span class="sort-opt-main">' + h(s[1]) + hint + "</span>" +
+        (on ? svg("check", "ico-sm") : "") +
+        "</button>";
+    }).join("");
+    openModal(
+      modalHead(kind === "task" ? "Ordina i lavori" : "Ordina le idee") +
+      '<div class="modal-body sort-list">' + rows + "</div>"
+    );
+  }
+
   /* ==========================================================
      ACTIONS (event delegation: un solo gestore)
      ========================================================== */
@@ -1527,6 +1757,8 @@
     switch (action) {
       /* --- navigazione --- */
       case "go": navigate("#" + node.getAttribute("data-route")); break;
+      case "go-opt": navigate("#opzioni/" + node.getAttribute("data-section")); break;
+      case "opzioni-root": navigate("#opzioni"); break;
       case "open-room": navigate("#stanza/" + id); break;
       case "open-task": navigate("#lavoro/" + id); break;
       case "open-idea": navigate("#idea/" + id); break;
@@ -1563,9 +1795,30 @@
       case "filter-prio":
         if (Date.now() < segSuppressUntil) break; // arriva da un drag: già gestito
         state.filterPrio = node.getAttribute("data-prio"); render(); break;
+
+      /* --- ordinamento liste + sezioni comprimibili --- */
+      case "open-sort": openSortSheet(node.getAttribute("data-kind")); break;
+      case "set-sort":
+        setSort(node.getAttribute("data-kind"), node.getAttribute("data-sort"));
+        closeModal(); render(); break;
+      case "toggle-done": state.doneOpen = !state.doneOpen; render(); break;
+      case "toggle-arch": state.archOpen = !state.archOpen; render(); break;
+      case "reorder-handle": break; // no-op: serve solo a non aprire il dettaglio
       case "add-task": openTaskModal(null, null); break;
       case "add-task-room": openTaskModal(null, node.getAttribute("data-room")); break;
       case "edit-task": openTaskModal(findTask(id), null); break;
+      case "set-task-status": {
+        var tss = findTask(id);
+        var ns = node.getAttribute("data-status");
+        if (tss && tss.status !== ns) {
+          var wasDone = tss.status === "fatto";
+          tss.status = ns; tss.updatedAt = nowISO();
+          if (ns === "fatto" && !wasDone) tss.completedAt = nowISO();
+          if (ns !== "fatto") tss.completedAt = null;
+          persist(); render();
+        }
+        break;
+      }
       case "del-task": {
         var t = findTask(id);
         openConfirm({
@@ -1773,6 +2026,8 @@
 
       /* --- modale/conferma generici --- */
       case "modal-close": closeModal(); break;
+      case "app-update": applyUpdate(); break;
+
       case "confirm-yes": { var fn2 = pendingConfirm; pendingConfirm = null; if (fn2) fn2(); break; }
       case "confirm-no": { var fc = pendingCancel; pendingCancel = null; pendingConfirm = null; if (fc) fc(); else closeModal(); break; }
     }
@@ -1784,19 +2039,17 @@
     if (!title) { toast("Inserisci un titolo", "error"); return; }
     var roomIds = readSelectedRooms();
     var priority = val(form, "priority") || "media";
-    var status = val(form, "status") || "da_fare";
     var description = val(form, "description");
     var dueDate = val(form, "dueDate");
     var id = form.getAttribute("data-id");
     if (id) {
       var t = findTask(id);
-      var wasDone = t.status === "fatto";
-      t.title = title; t.roomIds = roomIds; t.priority = priority; t.status = status;
+      // Lo stato NON si modifica da qui: si cambia dalla pagina del lavoro.
+      t.title = title; t.roomIds = roomIds; t.priority = priority;
       t.description = description; t.dueDate = dueDate; t.updatedAt = nowISO();
-      if (status === "fatto" && !wasDone) t.completedAt = nowISO();
-      if (status !== "fatto") t.completedAt = null;
     } else {
-      state.data.tasks.push(createTask({ title: title, roomIds: roomIds, priority: priority, status: status, description: description, dueDate: dueDate }));
+      // Ogni nuovo lavoro parte come "da fare" (default di createTask).
+      state.data.tasks.push(createTask({ title: title, roomIds: roomIds, priority: priority, description: description, dueDate: dueDate }));
     }
     persist(); closeModal(); toast("Lavoro salvato", "success"); render();
   }
@@ -2007,8 +2260,11 @@
     GD.lastConnectAt = Date.now();
     if (GD.popup) { try { GD.popup.close(); } catch (e) {} GD.popup = null; }
     toast("Google Drive collegato", "success");
-    if (gdAutoEnabled()) gdBackupNow(true);
     render();
+    // Confronta col backup cloud PRIMA di caricare: evita di sovrascrivere un
+    // backup valido con dati locali vuoti (es. primo collegamento su un nuovo
+    // dispositivo). gdAutoSyncCheck propone il ripristino o riallinea il cloud.
+    gdAutoSyncCheck();
   }
 
   // Da chiamare al boot: se torniamo da Google, salva il token e ripulisce l'URL.
@@ -2114,22 +2370,77 @@
     });
   }
 
+  // Scarica e restituisce il contenuto del backup su Drive (o null se assente).
+  function gdDownloadBackup(token) {
+    return gdFindFileId(token).then(function (fileId) {
+      if (!fileId) return null;
+      return gdReq("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media", {
+        headers: { Authorization: "Bearer " + token }
+      }).then(function (res) { return res.json(); });
+    });
+  }
+
+  // Applica un backup (oggetto dati) come stato corrente.
+  function gdApplyBackup(obj) {
+    state.data = normalizeData(obj);
+    persist();
+    try { localStorage.setItem(GD.LAST_KEY, nowISO()); } catch (e) {}
+    location.hash = needsSetup() ? "" : "#home";
+    render();
+  }
+
   function gdRestore() {
     var token = gdToken();
     if (!token) { toast("Sessione Drive scaduta, ricollega", "error"); return; }
-    gdFindFileId(token).then(function (fileId) {
-      if (!fileId) { toast("Nessun backup su Drive", "error"); return; }
-      return gdReq("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media", {
-        headers: { Authorization: "Bearer " + token }
-      }).then(function (res) { return res.json(); }).then(function (obj) {
-        if (!validateImport(obj)) { toast("Backup Drive non valido", "error"); return; }
-        state.data = normalizeData(obj);
-        persist();
-        toast("Ripristinato da Drive", "success");
-        location.hash = needsSetup() ? "" : "#home";
-        render();
-      });
+    gdDownloadBackup(token).then(function (obj) {
+      if (obj === null) { toast("Nessun backup su Drive", "error"); return; }
+      if (!validateImport(obj)) { toast("Backup Drive non valido", "error"); return; }
+      gdApplyBackup(obj);
+      toast("Ripristinato da Drive", "success");
     }).catch(function () { toast("Errore ripristino Drive", "error"); });
+  }
+
+  // Vero se il backup cloud è almeno aggiornato quanto l'ultima modifica locale.
+  function gdInSync() {
+    var last = localStorage.getItem(GD.LAST_KEY);
+    if (!last) return false;
+    var localT = (state.data && state.data.updatedAt) ? Date.parse(state.data.updatedAt) : 0;
+    return Date.parse(last) + 2000 >= localT;
+  }
+
+  // All'avvio (e dopo il collegamento): confronta il backup cloud con i dati
+  // locali. Se il cloud è PIÙ RECENTE, propone di caricarlo (niente sovrascrittura
+  // automatica). Se il locale è più recente e l'auto-backup è attivo, riallinea
+  // il cloud. Evita la perdita di dati del "vince l'ultimo che salva".
+  function gdAutoSyncCheck() {
+    if (!gdConnected()) return;
+    var token = gdToken();
+    gdDownloadBackup(token).then(function (obj) {
+      if (!obj || !validateImport(obj)) return;
+      var remoteT = obj.updatedAt ? Date.parse(obj.updatedAt) : 0;
+      var localT = (state.data && state.data.updatedAt) ? Date.parse(state.data.updatedAt) : 0;
+      if (remoteT && remoteT > localT + 2000) {
+        gdPromptRestore(obj, remoteT);                 // cloud più recente: chiedi
+      } else if (gdAutoEnabled() && localT > remoteT + 2000) {
+        gdBackupNow(true);                             // locale più recente: riallinea
+      }
+    }).catch(function () { /* offline o token scaduto: si ignora */ });
+  }
+
+  function gdPromptRestore(obj, remoteT) {
+    openConfirm({
+      title: "Backup cloud più recente",
+      message: "Su Google Drive c'è un backup più recente (<strong>" +
+        h(formatDateTime(new Date(remoteT).toISOString())) +
+        "</strong>), probabilmente da un altro dispositivo. Vuoi caricarlo qui?",
+      warn: "I dati attuali su questo dispositivo verranno sostituiti.",
+      confirmLabel: "Carica dal cloud",
+      onConfirm: function () {
+        closeModal();
+        gdApplyBackup(obj);
+        toast("Aggiornato dal cloud", "success");
+      }
+    });
   }
 
   function gdDisconnect() {
@@ -2159,6 +2470,58 @@
       el.classList.add("is-out");
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
     }, 2200);
+  }
+
+  /* ==========================================================
+     SERVICE WORKER (offline + aggiornamento controllato)
+     ========================================================== */
+  var swWaitingReg = null;     // registrazione con una nuova versione "in attesa"
+  var swReloading = false;     // evita ricariche multiple al controllerchange
+
+  function registerSW() {
+    if (!("serviceWorker" in navigator)) return;
+    // Il SW funziona solo via http/https: aprendo il file in locale (file://)
+    // non si registra, ma l'app continua a funzionare normalmente.
+    if (location.protocol !== "https:" && location.protocol !== "http:") return;
+
+    navigator.serviceWorker.register("./sw.js").then(function (reg) {
+      // Nuova versione già pronta al caricamento.
+      if (reg.waiting && navigator.serviceWorker.controller) swUpdateReady(reg);
+      // Nuova versione che arriva mentre l'app è aperta.
+      reg.addEventListener("updatefound", function () {
+        var nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener("statechange", function () {
+          if (nw.state === "installed" && navigator.serviceWorker.controller) swUpdateReady(reg);
+        });
+      });
+    }).catch(function () { /* registrazione fallita: l'app resta utilizzabile online */ });
+
+    // Quando la nuova versione prende il controllo, ricarica una sola volta.
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (swReloading) return;
+      swReloading = true;
+      location.reload();
+    });
+  }
+
+  function swUpdateReady(reg) {
+    swWaitingReg = reg;
+    var el = document.createElement("div");
+    el.className = "toast is-action";
+    el.innerHTML = svg("refresh", "ico-sm") +
+      "<span>Nuova versione disponibile</span>" +
+      '<button class="toast-btn" data-action="app-update">Aggiorna</button>';
+    elToast.innerHTML = "";
+    elToast.appendChild(el); // niente auto-dismiss: resta finché si aggiorna
+  }
+
+  function applyUpdate() {
+    if (swWaitingReg && swWaitingReg.waiting) {
+      swWaitingReg.waiting.postMessage("SKIP_WAITING"); // controllerchange ricaricherà
+    } else {
+      location.reload();
+    }
   }
 
   /* ==========================================================
@@ -2372,22 +2735,33 @@
     handleAction(form.getAttribute("data-action"), form, e);
   }
 
-  /* ---- Drag & drop per riordinare la checklist (Pointer Events: mouse + touch) ---- */
+  /* ---- Drag & drop per riordinare (Pointer Events: mouse + touch) ----
+     Usato sia per la checklist (.check-list / .check-row) sia per le liste
+     di lavori e idee in ordinamento "Manuale" (.reorder-list / .card). ---- */
   var dragState = null;
 
-  function rowIdsOf(list) {
-    return Array.prototype.slice.call(list.querySelectorAll(".check-row"))
+  // Selettore dei figli trascinabili in base al tipo di lista.
+  function dragItemSel(list) {
+    return list.classList.contains("reorder-list") ? ".card" : ".check-row";
+  }
+  function rowIdsOf(list, sel) {
+    return Array.prototype.slice.call(list.querySelectorAll(sel || dragItemSel(list)))
       .map(function (r) { return r.getAttribute("data-id"); });
   }
 
   function onPointerDown(e) {
     var handle = e.target.closest ? e.target.closest(".drag-handle") : null;
     if (!handle) return;
-    var row = handle.closest(".check-row");
-    var list = row ? row.closest(".check-list") : null;
+    var row = handle.closest(".check-row, .card");
+    var list = row ? row.closest(".check-list, .reorder-list") : null;
     if (!row || !list) return;
     e.preventDefault();
-    dragState = { row: row, list: list, startOrder: rowIdsOf(list).join("|") };
+    var sel = dragItemSel(list);
+    dragState = {
+      row: row, list: list, sel: sel,
+      kind: list.getAttribute("data-reorder") || "check",
+      startOrder: rowIdsOf(list, sel).join("|")
+    };
     row.classList.add("dragging");
     document.body.classList.add("is-dragging");
     try { row.setPointerCapture(e.pointerId); } catch (err) {}
@@ -2397,7 +2771,7 @@
     if (!dragState) return;
     e.preventDefault();
     var y = e.clientY;
-    var rows = Array.prototype.slice.call(dragState.list.querySelectorAll(".check-row"));
+    var rows = Array.prototype.slice.call(dragState.list.querySelectorAll(dragState.sel));
     var ref = null;
     for (var i = 0; i < rows.length; i++) {
       if (rows[i] === dragState.row) continue;
@@ -2415,8 +2789,11 @@
     st.row.classList.remove("dragging");
     document.body.classList.remove("is-dragging");
     try { st.row.releasePointerCapture(e.pointerId); } catch (err) {}
-    var ids = rowIdsOf(st.list);
-    if (ids.join("|") !== st.startOrder) commitChecklistOrder(ids);
+    var ids = rowIdsOf(st.list, st.sel);
+    if (ids.join("|") === st.startOrder) return; // nessuno spostamento
+    if (st.kind === "task") commitManualOrder(state.data.tasks, ids);
+    else if (st.kind === "idea") commitManualOrder(state.data.ideas, ids);
+    else commitChecklistOrder(ids);
   }
 
   function commitChecklistOrder(ids) {
@@ -2468,6 +2845,8 @@
     window.addEventListener("scroll", onScroll, { passive: true });
 
     render();
+    registerSW();      // offline + aggiornamento controllato
+    gdAutoSyncCheck(); // se collegato, confronta locale vs backup su Drive
   }
 
   if (document.readyState === "loading") {
