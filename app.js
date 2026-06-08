@@ -26,7 +26,23 @@
       { k: "colori", l: "Colori/Vernici" },
       { k: "online", l: "Online" },
       { k: "altro", l: "Altro" }
-    ]
+    ],
+    // ----- Backup su Google Drive (OAuth implicit, redirect, nessuna libreria) -----
+    GDRIVE: {
+      // ⬇️ INCOLLA QUI, UNA VOLTA SOLA, il tuo OAuth Client ID
+      //    (es. "12345-abc.apps.googleusercontent.com").
+      //    NON è un segreto e NON è per-utente: identifica l'app. Ogni utente
+      //    (tu, amici, parenti) preme "Collega Google Drive" e fa login col
+      //    PROPRIO account → il backup va sul SUO Drive. Finché è vuoto, la
+      //    sezione "Backup cloud" resta disattivata.
+      CLIENT_ID: "459414540865-uujs8bir389qendgpoud8nsqp74uo374.apps.googleusercontent.com",
+      // drive.file = scope NON sensibile: l'app vede/gestisce SOLO i file che
+      // crea lei (il backup), non il resto del Drive. Permette di pubblicare
+      // l'app "in produzione" senza verifica Google → login aperto a chiunque.
+      SCOPE: "https://www.googleapis.com/auth/drive.file",
+      FILE_NAME: "casa-app-backup.json",
+      AUTO_DEBOUNCE_MS: 6000
+    }
   };
   function shopCatLabel(k) {
     for (var i = 0; i < CONFIG.SHOP_CATEGORIES.length; i++) if (CONFIG.SHOP_CATEGORIES[i].k === k) return CONFIG.SHOP_CATEGORIES[i].l;
@@ -74,6 +90,8 @@
     calendar: '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v3"/><path d="M16 3v3"/>',
     bag: '<path d="M6 8h12l-.8 11.1a2 2 0 0 1-2 1.9H8.8a2 2 0 0 1-2-1.9L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
     coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.5-1.2-2.5-1.2-1.4 0-2.5.9-2.5 2s1.1 2 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2c-1 0-2-.4-2.5-1.2"/><path d="M12 6.5v11"/>',
+    cloud: '<path d="M7 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 9.5a3.5 3.5 0 0 1-.5 8.5z"/>',
+    cloudUp: '<path d="M7.5 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17.5 9.5a3.5 3.5 0 0 1 .2 7"/><path d="M12 21v-7"/><path d="M9 16l3-3 3 3"/>',
     // Icone stanze
     door: '<path d="M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><path d="M13 12h.01"/>',
     living: '<path d="M3 10V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3"/><path d="M3 14a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4H3z"/><path d="M6 20v1"/><path d="M18 20v1"/>',
@@ -105,6 +123,7 @@
 
   var pendingConfirm = null; // callback conferma azione distruttiva
   var pendingCancel = null;
+  var segSuppressUntil = 0;  // ignora il click sintetico dopo un drag della barra filtri
 
   // Riferimenti DOM principali
   var elHeader, elView, elNav, elToast, elModal;
@@ -132,6 +151,7 @@
     } catch (e) {
       toast("Spazio di salvataggio pieno", "error");
     }
+    gdScheduleAuto(); // backup cloud automatico (se collegato e attivo)
   }
 
   /* ==========================================================
@@ -400,19 +420,158 @@
     elView.innerHTML = body;
     window.scrollTo(0, 0);
     animateIn();
+    setupSegDrag();
+    setupSegSlide();
   }
 
-  // Entrata a cascata degli elementi di primo livello della vista corrente
-  function animateIn() {
-    if (prefersReducedMotion()) return;
-    var kids = elView.children;
-    for (var i = 0; i < kids.length; i++) {
-      kids[i].style.animationDelay = Math.min(i, 6) * 45 + "ms";
-      kids[i].classList.add("anim-in");
+  // Cascata d'entrata: ogni voce di lista (.stack) entra con un piccolo ritardo
+  // progressivo; i contenitori che racchiudono liste vengono attraversati; gli
+  // altri blocchi entrano singolarmente. Usata sia per l'intera vista sia per gli
+  // aggiornamenti mirati (lista Lavori / Spesa).
+  function cascade(parent, ctx) {
+    if (prefersReducedMotion() || !parent) return;
+    ctx = ctx || { i: 0 };
+    var step = 45, cap = 10, kids = parent.children;
+    for (var k = 0; k < kids.length; k++) {
+      var child = kids[k];
+      if (child.classList && child.classList.contains("stack")) {
+        var items = child.children;
+        for (var j = 0; j < items.length; j++) {
+          items[j].style.animationDelay = Math.min(ctx.i, cap) * step + "ms";
+          items[j].classList.add("anim-in");
+          ctx.i++;
+        }
+      } else if (child.querySelector && child.querySelector(".stack")) {
+        cascade(child, ctx); // contenitore con liste dentro (es. #lavori-list, #spesa-list)
+      } else {
+        child.style.animationDelay = Math.min(ctx.i, cap) * step + "ms";
+        child.classList.add("anim-in");
+        ctx.i++;
+      }
     }
   }
+  function animateIn() { cascade(elView); }
+
   function prefersReducedMotion() {
     return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  // ----- Helper condivisi per l'indicatore scorrevole (thumb) delle barre filtro -----
+  function segActiveBtn(bar) { return bar.querySelector(".seg-btn.is-active") || bar.querySelector(".seg-btn"); }
+  function segPlaceThumb(bar, btn, withTrans) {
+    var thumb = bar.querySelector(".seg-thumb");
+    if (!thumb || !btn) return;
+    if (!withTrans) thumb.style.transition = "none";
+    thumb.style.width = btn.offsetWidth + "px";
+    thumb.style.transform = "translateX(" + btn.offsetLeft + "px)";
+    if (!withTrans) { void thumb.offsetWidth; thumb.style.transition = ""; }
+  }
+  // Porta in vista (scroll orizzontale della sola barra) la voce attiva.
+  function segCenterActive(bar, smooth) {
+    var ab = segActiveBtn(bar);
+    if (!ab) return;
+    var target = Math.max(0, ab.offsetLeft - (bar.clientWidth - ab.offsetWidth) / 2);
+    if (bar.scrollTo) bar.scrollTo({ left: target, behavior: smooth ? "smooth" : "auto" });
+    else bar.scrollLeft = target;
+  }
+
+  // Indicatore scorrevole + trascinabile per la barra filtri Lavori (#prio-bar).
+  // Tap: gestito dal click (data-action). Drag: gestito qui, con snap al rilascio.
+  function setupSegDrag() {
+    var bar = document.getElementById("prio-bar");
+    if (!bar) return;
+    var thumb = bar.querySelector(".seg-thumb");
+    if (!thumb) return;
+
+    function activeBtn() { return segActiveBtn(bar); }
+    function placeThumb(btn, withTrans) { segPlaceThumb(bar, btn, withTrans); }
+    function nearestBtn(centerX) {
+      var btns = bar.querySelectorAll(".seg-btn"), best = null, bd = Infinity;
+      for (var i = 0; i < btns.length; i++) {
+        var c = btns[i].offsetLeft + btns[i].offsetWidth / 2;
+        var d = Math.abs(c - centerX);
+        if (d < bd) { bd = d; best = btns[i]; }
+      }
+      return best;
+    }
+
+    // Applica un filtro (da TAP o da DRAG): aggiorna stato e classi, fa scivolare
+    // il thumb sulla voce scelta, poi ricarica la lista con la dissolvenza voce per voce.
+    function selectBtn(target) {
+      if (!target) return;
+      segSuppressUntil = Date.now() + 500; // assorbe l'eventuale click sintetico post-pointer
+      if (target.getAttribute("data-prio") === state.filterPrio) return; // già attivo: nessun reload
+      state.filterPrio = target.getAttribute("data-prio");
+      var bs = bar.querySelectorAll(".seg-btn");
+      for (var i = 0; i < bs.length; i++) bs[i].classList.toggle("is-active", bs[i] === target);
+      refreshLavoriList();        // prima aggiorna la lista (layout stabile) e la dissolve voce per voce
+      placeThumb(target, true);   // poi il thumb scivola alla voce, con un leggero rimbalzo
+    }
+
+    // Posizione iniziale del thumb dopo che layout e testi sono stabili
+    // (evita misure sbagliate durante l'entrata della vista).
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { placeThumb(activeBtn(), false); });
+    });
+
+    var dragging = false, moved = false, startX = 0, thumbStart = 0, thumbW = 0, pressedBtn = null;
+
+    bar.addEventListener("pointerdown", function (e) {
+      dragging = true; moved = false;
+      startX = e.clientX;
+      pressedBtn = e.target && e.target.closest ? e.target.closest(".seg-btn") : null;
+      var ab = activeBtn();
+      thumbStart = ab ? ab.offsetLeft : 0;
+      thumbW = ab ? ab.offsetWidth : 0;
+      thumb.style.transition = "none";
+      try { bar.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    bar.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      var dx = e.clientX - startX;
+      if (Math.abs(dx) > 4) { moved = true; bar.classList.add("is-dragging"); }
+      if (!moved) return; // finché non si trascina in orizzontale, lascia lo scroll verticale
+      var maxL = bar.clientWidth - thumbW - 4;
+      var l = Math.max(4, Math.min(thumbStart + dx, maxL));
+      thumb.style.transform = "translateX(" + l + "px)";
+      e.preventDefault();
+    });
+
+    // commit=true su rilascio normale; false su annullo (es. parte lo scroll).
+    function finish(e, commit) {
+      if (!dragging) return;
+      dragging = false;
+      bar.classList.remove("is-dragging");
+      thumb.style.transition = "";
+      try { bar.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (!commit) { placeThumb(activeBtn(), true); return; } // annullato: rimetti il thumb sull'attivo
+      if (moved) {
+        // DRAG: scegli la voce più vicina al centro del thumb.
+        var m = /translateX\(([-0-9.]+)px\)/.exec(thumb.style.transform);
+        var curLeft = m ? parseFloat(m[1]) : thumbStart;
+        selectBtn(nearestBtn(curLeft + thumbW / 2));
+      } else {
+        // TAP diretto sulla voce.
+        selectBtn(pressedBtn);
+      }
+    }
+    bar.addEventListener("pointerup", function (e) { finish(e, true); });
+    bar.addEventListener("pointercancel", function (e) { finish(e, false); });
+  }
+
+  // Indicatore scorrevole per la barra filtri Spesa (#shop-bar). Qui NON c'è il
+  // drag-per-selezionare (la barra scorre in orizzontale): la selezione è a tap
+  // (gestita dal click → filter-shop), col thumb che scivola e leggero rimbalzo.
+  function setupSegSlide() {
+    var bar = document.getElementById("shop-bar");
+    if (!bar || !bar.querySelector(".seg-thumb")) return;
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        segPlaceThumb(bar, segActiveBtn(bar), false);
+        segCenterActive(bar, false);
+      });
+    });
   }
 
   // Intestazione colorata della stanza (fusa con la barra) + offset vista
@@ -469,7 +628,7 @@
       var idd = findIdea(route.param);
       return slimHeaderHtml("back-idea", idd ? idd.title : "Idea");
     }
-    var titles = { home: "Casa App", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
+    var titles = { home: "Home App", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
     return '<div class="grow"><div class="header-title">' + titles[route.name] + "</div></div>";
   }
 
@@ -643,24 +802,40 @@
   function viewLavori() {
     var filt = state.filterPrio;
     var segs = [["tutti", "Tutti"], ["alta", "Alta"], ["media", "Media"], ["bassa", "Bassa"]];
-    var seg = '<div class="segmented filter-bar">' + segs.map(function (s) {
-      return '<button class="seg-btn' + (filt === s[0] ? " is-active" : "") + '" data-action="filter-prio" data-prio="' + s[0] + '">' + s[1] + "</button>";
-    }).join("") + "</div>";
+    var seg = '<div class="segmented filter-bar seg-drag" id="prio-bar">' +
+      '<span class="seg-thumb" aria-hidden="true"></span>' +
+      segs.map(function (s) {
+        return '<button class="seg-btn' + (filt === s[0] ? " is-active" : "") + '" data-action="filter-prio" data-prio="' + s[0] + '">' + s[1] + "</button>";
+      }).join("") + "</div>";
 
+    return seg + '<div id="lavori-list">' + lavoriListHtml() + "</div>" + fab("add-task", "Aggiungi lavoro");
+  }
+
+  // Solo il corpo della lista Lavori (filtrato/ordinato): usato sia al primo
+  // render sia per l'aggiornamento mirato al cambio filtro (senza ridisegnare la barra).
+  function lavoriListHtml() {
+    var filt = state.filterPrio;
     var list = state.data.tasks.slice();
     if (filt !== "tutti") list = list.filter(function (t) { return t.priority === filt; });
     list.sort(function (a, b) {
       if (PRIO_RANK[a.priority] !== PRIO_RANK[b.priority]) return PRIO_RANK[a.priority] - PRIO_RANK[b.priority];
       return String(b.createdAt).localeCompare(String(a.createdAt));
     });
-
-    var body = list.length
+    return list.length
       ? '<div class="stack">' + list.map(taskCard).join("") + "</div>"
       : emptyState("tasks", "Nessun lavoro", filt === "tutti"
           ? "Aggiungi il primo lavoro con il pulsante +."
           : "Nessun lavoro con questa priorità.");
+  }
 
-    return seg + body + fab("add-task", "Aggiungi lavoro");
+  // Aggiorna solo la lista (la barra resta viva → il rimbalzo del thumb non viene
+  // interrotto) e fa entrare le card con la dissolvenza voce per voce.
+  function refreshLavoriList() {
+    var cont = document.getElementById("lavori-list");
+    if (!cont) { render(); return; }
+    cont.innerHTML = lavoriListHtml();
+    cascade(cont);
+    window.scrollTo(0, 0);
   }
 
   function taskCard(t) {
@@ -894,16 +1069,36 @@
       segs += '<button class="seg-btn' + (state.shopFilter === c.k ? " is-active" : "") + '" data-action="filter-shop" data-cat="' + c.k + '">' + h(c.l) + "</button>";
     });
     if (hasNone) segs += '<button class="seg-btn' + (state.shopFilter === "_none_" ? " is-active" : "") + '" data-action="filter-shop" data-cat="_none_">Senza categoria</button>';
-    return '<div class="segmented filter-bar">' + segs + "</div>";
+    return '<div class="segmented filter-bar seg-slide" id="shop-bar">' +
+      '<span class="seg-thumb" aria-hidden="true"></span>' + segs + "</div>";
+  }
+
+  // Solo il corpo della lista Spesa (sezioni "da prendere" e "Presi", filtrate):
+  // usato sia al primo render sia per l'aggiornamento mirato al cambio filtro.
+  function spesaListHtml() {
+    var all = state.data.shopping.slice();
+    var todo = all.filter(function (s) { return !s.done && matchShopFilter(s); }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+    var bought = all.filter(function (s) { return s.done && matchShopFilter(s); }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    return (todo.length ? '<div class="stack">' + todo.map(shopRow).join("") + "</div>"
+                        : '<p class="check-empty">Niente da prendere in questo filtro.</p>') +
+      (bought.length
+        ? '<div class="section-head" style="margin-top:20px"><h2>Presi</h2>' +
+            '<button class="btn btn-sm btn-ghost" data-action="clear-bought">Svuota presi</button></div>' +
+          '<div class="stack">' + bought.map(shopRow).join("") + "</div>"
+        : "");
+  }
+  function refreshSpesaList() {
+    var cont = document.getElementById("spesa-list");
+    if (!cont) { render(); return; }
+    cont.innerHTML = spesaListHtml();
+    cascade(cont);
+    window.scrollTo(0, 0);
   }
 
   function viewSpesa() {
     var all = state.data.shopping.slice();
     // Reset del filtro se la categoria selezionata non è più presente
     if (state.shopFilter !== "tutte" && !all.some(matchShopFilter)) state.shopFilter = "tutte";
-
-    var todo = all.filter(function (s) { return !s.done && matchShopFilter(s); }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
-    var bought = all.filter(function (s) { return s.done && matchShopFilter(s); }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
 
     var addForm =
       '<form class="shop-add" data-action="add-shop">' +
@@ -919,15 +1114,7 @@
     if (all.length === 0) {
       body = emptyState("cart", "Lista vuota", "Aggiungi gli articoli che ti servono con il campo qui sopra.");
     } else {
-      body =
-        shopFilterBar(all) +
-        (todo.length ? '<div class="stack">' + todo.map(shopRow).join("") + "</div>"
-                     : '<p class="check-empty">Niente da prendere in questo filtro.</p>') +
-        (bought.length
-          ? '<div class="section-head" style="margin-top:20px"><h2>Presi</h2>' +
-              '<button class="btn btn-sm btn-ghost" data-action="clear-bought">Svuota presi</button></div>' +
-            '<div class="stack">' + bought.map(shopRow).join("") + "</div>"
-          : "");
+      body = shopFilterBar(all) + '<div id="spesa-list">' + spesaListHtml() + "</div>";
     }
 
     return '<div class="shop-addwrap">' + addForm + "</div>" + body;
@@ -1037,6 +1224,8 @@
         optRow("import-json", "upload", "Importa JSON", "Ripristina da un file di backup") +
       "</div>" +
 
+      cloudOptGroup() +
+
       '<div class="opt-group">' +
         '<div class="opt-group-title">Aspetto</div>' +
         '<button class="opt-row" data-action="toggle-theme">' +
@@ -1079,6 +1268,52 @@
   }
   function diagRow(k, v) {
     return '<div class="diag-row"><span class="dg-key">' + k + '</span><span class="dg-val">' + h(v) + "</span></div>";
+  }
+
+  // Sezione "Backup cloud · Google Drive" in Opzioni (3 stati: non configurato / non connesso / connesso).
+  function cloudOptGroup() {
+    var html = '<div class="opt-group"><div class="opt-group-title">Backup cloud · Google Drive</div>';
+
+    if (!gdConfigured()) {
+      html +=
+        '<div class="diag"><div class="diag-row" style="display:block">' +
+          '<span class="dg-key">Non configurato</span>' +
+          '<div class="opt-sub" style="margin-top:6px;white-space:normal">Inserisci il tuo OAuth Client ID in <strong>CONFIG.GDRIVE.CLIENT_ID</strong> (app.js) per attivare il backup su Drive.</div>' +
+        "</div></div></div>";
+      return html;
+    }
+
+    if (!gdConnected()) {
+      html += optRow("gdrive-connect", "cloud", "Collega Google Drive", "Accedi per abilitare il backup");
+      html +=
+        '<div class="diag"><div class="diag-row" style="display:block">' +
+          '<span class="dg-key">Redirect URI da registrare</span>' +
+          '<div class="dg-val" style="margin-top:4px;word-break:break-all">' + h(gdRedirectUri()) + "</div>" +
+        "</div></div></div>";
+      return html;
+    }
+
+    var last = localStorage.getItem(GD.LAST_KEY);
+    html +=
+      '<button class="opt-row" data-action="gdrive-toggle-auto">' +
+        '<span class="opt-ico">' + svg("refresh") + "</span>" +
+        '<span class="opt-main"><span class="opt-label">Backup automatico</span>' +
+        '<span class="opt-sub">Salva su Drive a ogni modifica</span></span>' +
+        '<span class="switch ' + (gdAutoEnabled() ? "is-on" : "") + '"></span>' +
+      "</button>" +
+      optRow("gdrive-backup-now", "cloudUp", "Esegui backup ora", "Carica i dati attuali su Drive") +
+      optRow("gdrive-restore", "download", "Ripristina da Drive", "Sovrascrive i dati locali col backup cloud") +
+      '<button class="opt-row is-danger" data-action="gdrive-disconnect">' +
+        '<span class="opt-ico is-danger">' + svg("x") + "</span>" +
+        '<span class="opt-main"><span class="opt-label">Scollega Drive</span>' +
+        '<span class="opt-sub">Rimuove l\'accesso da questo dispositivo</span></span>' +
+      "</button>" +
+      '<div class="diag">' +
+        diagRow("Stato", "Connesso") +
+        diagRow("Ultimo backup cloud", last ? formatDateTime(last) : "mai") +
+      "</div>";
+    html += "</div>";
+    return html;
   }
 
   /* ==========================================================
@@ -1325,7 +1560,9 @@
         break;
 
       /* --- lavori --- */
-      case "filter-prio": state.filterPrio = node.getAttribute("data-prio"); render(); break;
+      case "filter-prio":
+        if (Date.now() < segSuppressUntil) break; // arriva da un drag: già gestito
+        state.filterPrio = node.getAttribute("data-prio"); render(); break;
       case "add-task": openTaskModal(null, null); break;
       case "add-task-room": openTaskModal(null, node.getAttribute("data-room")); break;
       case "edit-task": openTaskModal(findTask(id), null); break;
@@ -1386,7 +1623,20 @@
       }
       case "open-shop": openShopModal(findShop(id)); break;
       case "save-shop": saveShop(node); break;
-      case "filter-shop": state.shopFilter = node.getAttribute("data-cat"); render(); break;
+      case "filter-shop": {
+        var newCat = node.getAttribute("data-cat");
+        if (newCat === state.shopFilter) break; // già attivo: nessun reload
+        state.shopFilter = newCat;
+        var sbar = document.getElementById("shop-bar");
+        if (sbar) {
+          var sbs = sbar.querySelectorAll(".seg-btn");
+          for (var si = 0; si < sbs.length; si++) sbs[si].classList.toggle("is-active", sbs[si] === node);
+          refreshSpesaList();                // prima la lista (layout stabile), dissolvenza voce per voce
+          segPlaceThumb(sbar, node, true);   // poi il thumb scivola con leggero rimbalzo
+          segCenterActive(sbar, true);       // porta in vista la categoria scelta
+        } else { render(); }
+        break;
+      }
       case "toggle-shop": { var sh = findShop(id); if (sh) { sh.done = !sh.done; persist(); render(); } break; }
       case "del-shop": {
         state.data.shopping = state.data.shopping.filter(function (x) { return x.id !== id; });
@@ -1432,6 +1682,32 @@
       /* --- opzioni: dati --- */
       case "export-json": exportJSON(); break;
       case "import-json": importJSON(); break;
+
+      /* --- opzioni: backup cloud (Google Drive) --- */
+      case "gdrive-connect": gdConnect(); break;
+      case "gdrive-backup-now": gdBackupNow(false); break;
+      case "gdrive-toggle-auto":
+        gdSetAuto(!gdAutoEnabled());
+        if (gdAutoEnabled()) { toast("Backup automatico attivo", "success"); gdBackupNow(true); }
+        render();
+        break;
+      case "gdrive-restore":
+        openConfirm({
+          title: "Ripristina da Drive",
+          message: "I dati locali verranno <strong>sovrascritti</strong> con il backup salvato su Google Drive.",
+          warn: "Operazione non annullabile.",
+          confirmLabel: "Ripristina",
+          onConfirm: function () { closeModal(); gdRestore(); }
+        });
+        break;
+      case "gdrive-disconnect":
+        openConfirm({
+          title: "Scollega Drive",
+          message: "Vuoi rimuovere l'accesso a Google Drive da questo dispositivo?",
+          confirmLabel: "Scollega",
+          onConfirm: function () { closeModal(); gdDisconnect(); }
+        });
+        break;
       case "reset-data":
         openConfirm({
           title: "Reset dati",
@@ -1641,6 +1917,233 @@
     if (!Array.isArray(obj.house.floors) || !Array.isArray(obj.house.rooms)) return false;
     if (!Array.isArray(obj.tasks) || !Array.isArray(obj.ideas)) return false;
     return true;
+  }
+
+  /* ==========================================================
+     GOOGLE DRIVE SYNC
+     OAuth 2.0 implicit flow con redirect a pagina intera
+     (adatto alla PWA installata su iPhone/iPad), nessuna libreria,
+     nessun backend, nessun client secret. Il token (~1h) sta in
+     localStorage; il backup è un file JSON ("casa-app-backup.json")
+     creato dall'app sul Drive dell'utente. Con lo scope drive.file
+     l'app vede solo i file che ha creato lei.
+     ========================================================== */
+  var GD = {
+    TOKEN_KEY: "casa-app-gdrive-token",
+    EXPIRY_KEY: "casa-app-gdrive-expiry",
+    AUTO_KEY: "casa-app-gdrive-auto",
+    LAST_KEY: "casa-app-gdrive-last",
+    RETURN_KEY: "casa-app-gdrive-return",
+    autoTimer: null,
+    popup: null,        // riferimento alla finestra popup di login
+    lastConnectAt: 0,   // anti doppio "collegato" (message + storage)
+    closing: false      // true se QUESTA pagina è il popup che deve chiudersi
+  };
+
+  function gdConfigured() { return !!(CONFIG.GDRIVE && CONFIG.GDRIVE.CLIENT_ID); }
+
+  // L'URL della pagina (senza hash) deve combaciare ESATTAMENTE con un
+  // "URI di reindirizzamento autorizzato" registrato sulla Google Console.
+  function gdRedirectUri() { return location.origin + location.pathname; }
+
+  function gdToken() {
+    var t = localStorage.getItem(GD.TOKEN_KEY);
+    var exp = parseInt(localStorage.getItem(GD.EXPIRY_KEY) || "0", 10);
+    if (!t || !exp || Date.now() > exp) return null;
+    return t;
+  }
+  function gdConnected() { return !!gdToken(); }
+  function gdAutoEnabled() { return localStorage.getItem(GD.AUTO_KEY) === "1"; }
+  function gdSetAuto(on) {
+    if (on) localStorage.setItem(GD.AUTO_KEY, "1");
+    else localStorage.removeItem(GD.AUTO_KEY);
+  }
+  function gdClearToken() {
+    localStorage.removeItem(GD.TOKEN_KEY);
+    localStorage.removeItem(GD.EXPIRY_KEY);
+  }
+
+  // Costruisce l'URL di autorizzazione Google. mode = "popup" | "redir"
+  // (lo ritroviamo in map.state per capire come gestire il ritorno).
+  function gdAuthUrl(mode, nonce) {
+    return "https://accounts.google.com/o/oauth2/v2/auth?" +
+      "client_id=" + encodeURIComponent(CONFIG.GDRIVE.CLIENT_ID) +
+      "&redirect_uri=" + encodeURIComponent(gdRedirectUri()) +
+      "&response_type=token" +
+      "&scope=" + encodeURIComponent(CONFIG.GDRIVE.SCOPE) +
+      "&include_granted_scopes=true" +
+      "&state=" + encodeURIComponent(mode + ":" + nonce);
+  }
+
+  // Avvia il login. Prova prima il POPUP: l'app principale resta aperta e il
+  // ricollegamento è immediato. Se il popup è bloccato/non disponibile (es.
+  // alcune PWA installate su iOS), ripiega automaticamente sul redirect a
+  // pagina intera. In entrambi i casi si usa lo stesso Redirect URI.
+  function gdConnect() {
+    if (!gdConfigured()) { toast("Client ID Google non configurato", "error"); return; }
+    var nonce = Math.random().toString(36).slice(2);
+    var w = null;
+    try {
+      w = window.open(gdAuthUrl("popup", nonce), "gdlogin",
+        "width=480,height=640,menubar=no,toolbar=no,location=yes");
+    } catch (e) { w = null; }
+    if (w && !w.closed) {
+      GD.popup = w;
+      toast("Completa l'accesso nella finestra Google", "info");
+      return;
+    }
+    // Fallback: redirect a pagina intera.
+    gdConnectRedirect(nonce);
+  }
+
+  function gdConnectRedirect(nonce) {
+    try { localStorage.setItem(GD.RETURN_KEY, location.hash || "#opzioni"); } catch (e) {}
+    location.href = gdAuthUrl("redir", nonce || Math.random().toString(36).slice(2));
+  }
+
+  // Chiamata quando arriva un token via popup (message o storage event).
+  function gdOnConnected() {
+    if (Date.now() - (GD.lastConnectAt || 0) < 1500) return; // evita doppio avviso
+    GD.lastConnectAt = Date.now();
+    if (GD.popup) { try { GD.popup.close(); } catch (e) {} GD.popup = null; }
+    toast("Google Drive collegato", "success");
+    if (gdAutoEnabled()) gdBackupNow(true);
+    render();
+  }
+
+  // Da chiamare al boot: se torniamo da Google, salva il token e ripulisce l'URL.
+  function gdHandleRedirect() {
+    var hash = location.hash || "";
+    if (hash.indexOf("access_token=") === -1) return false;
+    var frag = hash.charAt(0) === "#" ? hash.slice(1) : hash;
+    var parts = frag.split("&");
+    var map = {};
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].split("=");
+      map[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || "");
+    }
+    if (!map.access_token) return false;
+    var expiresIn = parseInt(map.expires_in || "3600", 10);
+    try {
+      localStorage.setItem(GD.TOKEN_KEY, map.access_token);
+      // Margine di 60s per evitare di usare un token già scaduto.
+      // (localStorage è condiviso per origine: l'app principale lo vede subito.)
+      localStorage.setItem(GD.EXPIRY_KEY, String(Date.now() + (expiresIn - 60) * 1000));
+    } catch (e) {}
+
+    // Caso POPUP: avvisa la finestra principale e chiudi questa.
+    var isPopup = (map.state || "").indexOf("popup:") === 0;
+    if (isPopup && window.opener && window.opener !== window) {
+      try { window.opener.postMessage({ type: "gd-auth", ok: true }, location.origin); } catch (e) {}
+      GD.closing = true;
+      try { window.close(); } catch (e) {}
+      return true;
+    }
+
+    // Caso REDIRECT a pagina intera: ripristina la rotta e pulisci l'URL.
+    var back = localStorage.getItem(GD.RETURN_KEY) || "#opzioni";
+    localStorage.removeItem(GD.RETURN_KEY);
+    if (window.history && history.replaceState) {
+      history.replaceState(null, "", location.pathname + location.search + back);
+    } else {
+      location.hash = back;
+    }
+    return true;
+  }
+
+  function gdReq(url, opts) {
+    return fetch(url, opts).then(function (res) {
+      if (res.status === 401) { gdClearToken(); }
+      if (!res.ok) { throw new Error("HTTP " + res.status); }
+      return res;
+    });
+  }
+
+  function gdFindFileId(token) {
+    // Con drive.file la lista contiene SOLO i file creati da quest'app,
+    // quindi cerchiamo il nostro backup per nome.
+    var q = encodeURIComponent("name='" + CONFIG.GDRIVE.FILE_NAME + "' and trashed=false");
+    var url = "https://www.googleapis.com/drive/v3/files?q=" + q +
+      "&fields=files(id,name,modifiedTime)";
+    return gdReq(url, { headers: { Authorization: "Bearer " + token } })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var files = data.files || [];
+        return files.length ? files[0].id : null;
+      });
+  }
+
+  function gdUpload(token) {
+    var json = JSON.stringify(state.data);
+    return gdFindFileId(token).then(function (fileId) {
+      if (fileId) {
+        return gdReq("https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media", {
+          method: "PATCH",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: json
+        });
+      }
+      // Primo backup: crea il file (richiesta multipart metadati + contenuto).
+      var boundary = "casaapp" + Date.now().toString(36);
+      var metadata = { name: CONFIG.GDRIVE.FILE_NAME };
+      var body =
+        "--" + boundary + "\r\n" +
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+        JSON.stringify(metadata) + "\r\n" +
+        "--" + boundary + "\r\n" +
+        "Content-Type: application/json\r\n\r\n" +
+        json + "\r\n" +
+        "--" + boundary + "--";
+      return gdReq("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "multipart/related; boundary=" + boundary },
+        body: body
+      });
+    });
+  }
+
+  // silent=true => nessun toast/render (uso dal backup automatico).
+  function gdBackupNow(silent) {
+    var token = gdToken();
+    if (!token) { if (!silent) toast("Sessione Drive scaduta, ricollega", "error"); return; }
+    gdUpload(token).then(function () {
+      try { localStorage.setItem(GD.LAST_KEY, nowISO()); } catch (e) {}
+      if (!silent) { toast("Backup salvato su Drive", "success"); if (parseHash().name === "opzioni") render(); }
+    }).catch(function () {
+      if (!silent) { toast("Errore backup Drive", "error"); render(); }
+    });
+  }
+
+  function gdRestore() {
+    var token = gdToken();
+    if (!token) { toast("Sessione Drive scaduta, ricollega", "error"); return; }
+    gdFindFileId(token).then(function (fileId) {
+      if (!fileId) { toast("Nessun backup su Drive", "error"); return; }
+      return gdReq("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media", {
+        headers: { Authorization: "Bearer " + token }
+      }).then(function (res) { return res.json(); }).then(function (obj) {
+        if (!validateImport(obj)) { toast("Backup Drive non valido", "error"); return; }
+        state.data = normalizeData(obj);
+        persist();
+        toast("Ripristinato da Drive", "success");
+        location.hash = needsSetup() ? "" : "#home";
+        render();
+      });
+    }).catch(function () { toast("Errore ripristino Drive", "error"); });
+  }
+
+  function gdDisconnect() {
+    gdClearToken();
+    gdSetAuto(false);
+    toast("Drive scollegato", "success");
+    render();
+  }
+
+  // Debounce: dopo l'ultima modifica, attende e carica una sola volta.
+  function gdScheduleAuto() {
+    if (!gdAutoEnabled() || !gdToken()) return;
+    if (GD.autoTimer) clearTimeout(GD.autoTimer);
+    GD.autoTimer = setTimeout(function () { gdBackupNow(true); }, CONFIG.GDRIVE.AUTO_DEBOUNCE_MS);
   }
 
   var toastTimer = null;
@@ -1936,6 +2439,20 @@
     elNav = document.getElementById("bottom-nav");
     elToast = document.getElementById("toast-host");
     elModal = document.getElementById("modal-host");
+
+    // Se torniamo dal login Google, intercetta il token PRIMA del routing.
+    gdHandleRedirect();
+    // Se questa pagina è il popup di login, si è già chiusa/avvisata: stop qui.
+    if (GD.closing) { document.title = "Accesso completato"; return; }
+
+    // Token in arrivo dal popup: via postMessage o via evento storage (backup).
+    window.addEventListener("message", function (ev) {
+      if (ev.origin !== location.origin) return;
+      if (ev.data && ev.data.type === "gd-auth" && ev.data.ok) gdOnConnected();
+    }, false);
+    window.addEventListener("storage", function (ev) {
+      if (ev.key === GD.TOKEN_KEY && ev.newValue) gdOnConnected();
+    }, false);
 
     var loaded = loadData();
     if (loaded) { state.data = loaded; }

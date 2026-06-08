@@ -28,7 +28,8 @@ dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
   a una stanza, a un lavoro o a un'idea. Filtro per categoria. Tocca un
   articolo per modificarlo.
 - OPZIONI: tema chiaro/scuro, colore accento, gestione piani e stanze,
-  diagnostica, esporta/importa JSON, reset dati.
+  diagnostica, esporta/importa JSON, backup automatico su Google Drive,
+  reset dati.
 
 NOTA: la gestione delle STANZE è dentro la gestione dei PIANI/AREE
 (Opzioni -> Gestione piani/aree -> tocca un piano -> aggiungi/gestisci
@@ -134,7 +135,97 @@ IMPORTARE:
 Suggerimento: esporta un backup prima di fare un Reset dati.
 
 ----------------------------------------
- 6. PRIMO AVVIO
+ 6. BACKUP AUTOMATICO SU GOOGLE DRIVE
+----------------------------------------
+
+Oltre all'export/import manuale, l'app può salvare i dati da sola su
+Google Drive a ogni modifica, così hai sempre un backup nel cloud e puoi
+recuperarlo su un altro dispositivo. Funziona anche dall'app installata
+sulla Home di iPhone/iPad. Tutto avviene nel browser: niente server,
+nessuna password salvata. Il backup è un file "casa-app-backup.json"
+creato dall'app nel Drive di chi fa login (l'app vede SOLO quel file,
+non il resto del tuo Drive).
+
+IMPORTANTE - distribuzione ad amici/parenti:
+Il "Client ID" qui sotto NON è una password e NON è per-utente: identifica
+l'APP. Lo metti TU una volta sola dentro app.js. Chiunque usi l'app (tu,
+amici, parenti) preme semplicemente "Collega Google Drive" e fa login col
+PROPRIO account: il backup finisce sul SUO Drive. Nessuno deve inserire il
+Client ID né configurare niente. Puoi quindi dare l'app già pronta.
+
+NOTA: iCloud non è supportato perché Apple non offre un modo per scrivere
+su iCloud Drive da una web app. OneDrive sarebbe possibile ma non incluso.
+
+--- A. CONFIGURAZIONE (la fa SOLO chi pubblica l'app, una volta, gratis) ---
+
+Serve un "Client ID" di Google. Lo crei col tuo account così:
+
+  1. Vai su  https://console.cloud.google.com  e crea un progetto
+     (es. "Casa App").
+  2. API e servizi -> Libreria -> cerca "Google Drive API" -> Abilita.
+  3. API e servizi -> Schermata consenso OAuth:
+       - Tipo utente: Esterno.
+       - Compila nome app, email di assistenza e email sviluppatore.
+       - Stato di pubblicazione: premi "PUBBLICA APP" -> stato
+         "In produzione". Così CHIUNQUE può fare login, non solo gli
+         utenti di test.
+     IMPORTANTE: l'app usa lo scope "drive.file", che Google considera
+     NON sensibile. Significa che, anche "in produzione", NON serve la
+     verifica di Google: la pubblichi e funziona subito per tutti.
+     (Se la lasci in stato "Test" funziona solo per le email che aggiungi
+      a mano in "Utenti di test", max 100.)
+  4. API e servizi -> Credenziali -> Crea credenziali ->
+     ID client OAuth -> tipo "Applicazione web".
+  5. In "URI di reindirizzamento autorizzati" incolla ESATTAMENTE
+     l'indirizzo che l'app ti mostra:
+       apri l'app pubblicata -> OPZIONI -> sezione
+       "Backup cloud - Google Drive" -> sotto "Collega Google Drive"
+       trovi la voce "Redirect URI da registrare".
+     Sarà tipo:  https://TUONOME.github.io/NOMEREPO/index.html
+     Copialo identico (deve combaciare carattere per carattere).
+     NOTA: se distribuisci l'app da indirizzi diversi (es. ogni amico ha
+     la sua repo GitHub), aggiungi qui TUTTI quegli indirizzi. In
+     alternativa pubblica un'unica copia dell'app che usano tutti.
+  6. Crea: copia l'ID client (finisce con .apps.googleusercontent.com).
+
+--- B. INSERIRE L'ID NELL'APP (lo fa chi pubblica, una volta sola) ---
+
+  1. Apri il file  app.js.
+  2. Cerca la riga:   CLIENT_ID: ""
+     (dentro CONFIG.GDRIVE, in alto nel file).
+  3. Incolla il tuo ID tra le virgolette, es.:
+       CLIENT_ID: "12345-abc.apps.googleusercontent.com"
+  4. Salva e ricarica i file su GitHub (vedi punto 2).
+  Da questo momento il pulsante "Collega Google Drive" funziona per
+  chiunque apra quella copia dell'app, ognuno col proprio account.
+
+--- C. USO QUOTIDIANO ---
+
+  - OPZIONI -> "Collega Google Drive" -> accedi col tuo account.
+  - Attiva "Backup automatico": da quel momento ogni modifica viene
+    salvata su Drive (con un piccolo ritardo per non sovraccaricare).
+  - "Esegui backup ora": forza subito un salvataggio.
+  - "Ripristina da Drive": SOVRASCRIVE i dati locali con quelli del
+    backup cloud (utile su un nuovo dispositivo). Chiede conferma.
+  - "Scollega Drive": rimuove l'accesso da questo dispositivo.
+
+--- D. COSE DA SAPERE ---
+
+  - L'accesso dura circa 1 ora: ogni tanto l'app chiederà di ricollegarti
+    con un tocco. È normale (non si possono tenere sessioni infinite senza
+    un server). Il ricollegamento avviene in una piccola FINESTRA POPUP:
+    fai login lì e l'app si aggiorna da sola, senza ricaricare. Se il
+    dispositivo blocca i popup, l'app passa automaticamente al metodo a
+    pagina intera (redirect).
+  - Il backup è "a senso unico verso il cloud": su un secondo dispositivo
+    fai una volta "Ripristina da Drive" per allinearti. Se modifichi su
+    due dispositivi, vince l'ultimo che ha salvato.
+  - Il file "casa-app-backup.json" è visibile nel Drive dell'utente: lo
+    si recupera dall'app con "Ripristina", ma volendo si può anche
+    scaricare a mano da Google Drive.
+
+----------------------------------------
+ 7. PRIMO AVVIO
 ----------------------------------------
 
 Al primo avvio l'app è vuota e mostra la schermata "CONFIGURA CASA":
@@ -148,7 +239,7 @@ Dopo il primo avvio, piani/aree e stanze si gestiscono da OPZIONI
 Dopo un Reset dati l'app torna alla schermata "CONFIGURA CASA".
 
 ----------------------------------------
- 7. DIAGNOSTICA (in OPZIONI)
+ 8. DIAGNOSTICA (in OPZIONI)
 ----------------------------------------
 
 In OPZIONI trovi un box "Diagnostica" che mostra lo stato dei dati:

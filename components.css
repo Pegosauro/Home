@@ -223,6 +223,36 @@
   box-shadow: 0 6px 16px -6px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
+/* Barra con indicatore scorrevole + trascinabile (es. filtro Lavori).
+   Il "thumb" è l'evidenziatore che scivola sotto il dito; le voci sono
+   sopra di esso. Le barre senza .seg-drag (es. Spesa) restano invariate. */
+.seg-drag, .seg-slide { position: relative; }
+.seg-drag { touch-action: pan-y; } /* il drag-per-selezionare cattura l'orizzontale */
+.seg-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 84%, #fff 16%), var(--accent));
+  box-shadow: 0 6px 16px -6px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateX(0);
+  /* Movimento con leggero rimbalzo (overshoot); la larghezza resta morbida. */
+  transition: transform 0.42s cubic-bezier(0.34, 1.4, 0.6, 1), width 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, width;
+}
+.seg-drag .seg-btn, .seg-slide .seg-btn { position: relative; z-index: 1; background: transparent; }
+.seg-drag .seg-btn.is-active, .seg-slide .seg-btn.is-active {
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent-text);
+}
+.seg-drag.is-dragging { cursor: grabbing; }
+.seg-drag.is-dragging .seg-thumb { transition: none; }
+
 /* ---------------- FORM ---------------- */
 .field { margin-bottom: 14px; }
 .field > label {
