@@ -12,7 +12,7 @@
    qui sotto (es. casa-app-2.6.1). Così il browser scarta la vecchia
    cache e propone l'aggiornamento.
    ============================================================ */
-var CACHE_VERSION = "casa-app-2.9.1";
+var CACHE_VERSION = "casa-app-2.9.2";
 
 // File che compongono l'app (tutti nella root, stesso livello di index.html).
 var APP_SHELL = [

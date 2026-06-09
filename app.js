@@ -11,7 +11,7 @@
      ========================================================== */
   var CONFIG = {
     STORAGE_KEY: "casa-app-v2-data",
-    VERSION: "2.9.1",
+    VERSION: "2.9.2",
     DEFAULT_ACCENT: "#218bff",
     ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
     ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"],
@@ -53,8 +53,14 @@
   var PRIO_LABEL = { alta: "Alta", media: "Media", bassa: "Bassa" };
   var PRIO_RANK = { alta: 0, media: 1, bassa: 2 };
   var STATUS_LABEL = { da_fare: "Da fare", in_corso: "In corso", in_attesa: "In attesa", fatto: "Fatto" };
-  var IDEA_LABEL = { bozza: "Bozza", da_valutare: "Da valutare", approvata: "Approvato", archiviata: "Archiviato" };
-  var IDEA_RANK = { approvata: 0, da_valutare: 1, bozza: 2, archiviata: 3 };
+  var IDEA_LABEL = { bozza: "Bozza", wip: "WIP", realizzato: "Realizzato" };
+  var IDEA_RANK = { wip: 0, bozza: 1, realizzato: 2 };
+  // Migrazione dal vecchio schema a 4 stati: i progetti salvati prima passano
+  // al nuovo modello (Bozza / WIP / Realizzato) al caricamento.
+  var IDEA_STATUS_MIGRATE = {
+    bozza: "bozza", da_valutare: "bozza", approvata: "wip", archiviata: "realizzato",
+    wip: "wip", realizzato: "realizzato"
+  };
 
   // Modalità di ordinamento (chiave + etichetta). "manuale" sblocca il drag&drop.
   var TASK_SORTS = [
@@ -147,14 +153,13 @@
     currentIdeaId: null,   // idea aperta nella pagina dettaglio
     manageFloorId: null,   // piano in gestione (drill-down stanze in Opzioni)
     doneOpen: false,       // sezione "Completati" (Lavori) espansa
-    archOpen: false,       // sezione "Archiviate" (Idee) espansa
+    archOpen: false,       // sezione "Realizzati" (Progetti) espansa
     boughtOpen: false      // sezione "Presi" (Spesa) espansa
   };
 
   var pendingConfirm = null; // callback conferma azione distruttiva
   var pendingCancel = null;
   var segSuppressUntil = 0;  // ignora il click sintetico dopo un drag della barra filtri
-  var pendingStatusSlide = null; // stato di partenza per far scivolare il thumb dopo un re-render
 
   // Riferimenti DOM principali
   var elHeader, elView, elNav, elToast, elModal;
@@ -243,6 +248,7 @@
       i.checklist = Array.isArray(i.checklist) ? i.checklist : [];
       i.link = typeof i.link === "string" ? i.link : "";
       i.cost = typeof i.cost === "string" ? i.cost : (i.cost != null ? String(i.cost) : "");
+      i.status = IDEA_STATUS_MIGRATE[i.status] || "bozza";
       i.order = typeof i.order === "number" ? i.order : idx;
       return i;
     });
@@ -544,7 +550,7 @@
     }
     elView.innerHTML = body;
     // keepScroll: usato dai toggle delle sezioni comprimibili (Presi/Completati/
-    // Archiviate) per espandere/chiudere SENZA saltare in cima né rifare la
+    // Realizzati) per espandere/chiudere SENZA saltare in cima né rifare la
     // dissolvenza d'entrata.
     if (keepScroll) {
       keepScroll = false;
@@ -622,18 +628,15 @@
       segPlaceThumb(prio, target, true); // poi il thumb scivola sulla voce scelta
     });
 
+    // Selettore di stato del dettaglio: aggiornamento mirato in-place (niente
+    // render() completo) così non c'è l'effetto refresh e il thumb scivola davvero.
     var status = document.getElementById("status-bar");
-    // applyStatusFromBtn fa un render() completo: il thumb scivolerà comunque
-    // grazie a pendingStatusSlide (posizione di partenza ricordata).
-    if (status) setupSegBar(status, function (target) { applyStatusFromBtn(target); }, pendingStatusSlide);
-    pendingStatusSlide = null;
+    if (status) setupSegBar(status, setStatusInPlace);
   }
 
   // Plumbing condiviso del thumb (posizionamento iniziale + drag con snap).
-  // onSelect(targetBtn) viene chiamato al commit (tap o drag); animateFromStatus,
-  // se valorizzato, fa partire il thumb dal segmento del vecchio stato e lo fa
-  // scivolare su quello attivo (usato dopo il re-render del dettaglio).
-  function setupSegBar(bar, onSelect, animateFromStatus) {
+  // onSelect(targetBtn) viene chiamato al commit (tap o drag).
+  function setupSegBar(bar, onSelect) {
     var thumb = bar.querySelector(".seg-thumb");
     if (!thumb) return;
 
@@ -657,17 +660,7 @@
     // Posizione iniziale del thumb dopo che layout e testi sono stabili
     // (evita misure sbagliate durante l'entrata della vista).
     requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        if (animateFromStatus != null) {
-          var from = bar.querySelector('[data-status="' + animateFromStatus + '"]');
-          if (from) {
-            placeThumb(from, false); // parti dal vecchio stato...
-            requestAnimationFrame(function () { placeThumb(activeBtn(), true); }); // ...e scivola sul nuovo
-            return;
-          }
-        }
-        placeThumb(activeBtn(), false);
-      });
+      requestAnimationFrame(function () { placeThumb(activeBtn(), false); });
     });
 
     var dragging = false, moved = false, startX = 0, thumbStart = 0, thumbW = 0, pressedBtn = null;
@@ -716,31 +709,52 @@
     bar.addEventListener("pointercancel", function (e) { finish(e, false); });
   }
 
-  // Applica il cambio di stato (lavoro/idea) da un bottone della barra di stato.
-  // Ricorda lo stato di partenza in pendingStatusSlide così, dopo il render(),
-  // il thumb scivola dal vecchio al nuovo segmento.
-  function applyStatusFromBtn(btn) {
+  // Applica il cambio di stato (lavoro/idea) da un bottone della barra di stato
+  // AGGIORNANDO SOLO L'INTERESSATO, senza render() completo: niente effetto
+  // refresh, il thumb scivola sul nuovo segmento e ne assume il colore.
+  function setStatusInPlace(btn) {
+    var bar = document.getElementById("status-bar");
+    if (!bar) return;
     var action = btn.getAttribute("data-action");
     var id = btn.getAttribute("data-id");
     var ns = btn.getAttribute("data-status");
-    if (action === "set-task-status") {
+    var isTask = action === "set-task-status";
+    var changed = false;
+    if (isTask) {
       var t = findTask(id);
       if (t && t.status !== ns) {
-        pendingStatusSlide = t.status;
         var wasDone = t.status === "fatto";
         t.status = ns; t.updatedAt = nowISO();
         if (ns === "fatto" && !wasDone) t.completedAt = nowISO();
         if (ns !== "fatto") t.completedAt = null;
-        persist(); render();
+        changed = true;
+        refreshTaskDetailStatusBits(t); // barratura titolo + badge priorità
       }
-    } else if (action === "set-idea-status") {
+    } else {
       var i = findIdea(id);
-      if (i && i.status !== ns) {
-        pendingStatusSlide = i.status;
-        i.status = ns; i.updatedAt = nowISO();
-        persist(); render();
-      }
+      if (i && i.status !== ns) { i.status = ns; i.updatedAt = nowISO(); changed = true; }
     }
+    if (!changed) return;
+    persist();
+    // Aggiorna la barra in-place: classi attive, colore del thumb e scorrimento.
+    var bs = bar.querySelectorAll(".seg-btn");
+    for (var k = 0; k < bs.length; k++) {
+      var on = bs[k] === btn;
+      bs[k].classList.toggle("is-active", on);
+      bs[k].setAttribute("aria-pressed", on);
+    }
+    bar.style.setProperty("--seg-c", "var(" + bar.getAttribute("data-varprefix") + ns + ")");
+    segPlaceThumb(bar, btn, true);
+  }
+
+  // Aggiorna i pezzi del dettaglio Lavoro che dipendono dallo stato, senza
+  // ridisegnare l'intera pagina (titolo barrato e riga badge priorità/scadenza).
+  function refreshTaskDetailStatusBits(t) {
+    var done = t.status === "fatto";
+    var title = document.querySelector(".detail-card .detail-title");
+    if (title) title.classList.toggle("is-done", done);
+    var badges = document.querySelector(".detail-card .task-badges");
+    if (badges) badges.innerHTML = (done ? "" : prioBadge(t.priority)) + dueBadgeHtml(t);
   }
 
   // Intestazione colorata della stanza (fusa con la barra) + offset vista
@@ -1041,7 +1055,7 @@
     return body + collapsibleDone("done", state.doneOpen, "Completati", done, function (t) { return taskCard(t, false); });
   }
 
-  // Sezione comprimibile in fondo (Completati / Archiviate).
+  // Sezione comprimibile in fondo (Completati / Realizzati).
   function collapsibleDone(toggleAction, open, label, items, cardFn) {
     if (!items.length) return "";
     return '<div class="done-section">' +
@@ -1103,19 +1117,19 @@
     var all = state.data.ideas.slice();
     var mode = ideaSort();
     var manual = mode === "manuale";
-    var active = sortIdeas(all.filter(function (i) { return i.status !== "archiviata"; }), mode);
-    var arch = all.filter(function (i) { return i.status === "archiviata"; }).sort(byCreatedDesc);
+    var active = sortIdeas(all.filter(function (i) { return i.status !== "realizzato"; }), mode);
+    var arch = all.filter(function (i) { return i.status === "realizzato"; }).sort(byCreatedDesc);
 
     var body;
     if (active.length) {
       body = '<div class="stack reorder-list" data-reorder="idea">' +
         active.map(function (i) { return ideaCard(i, manual && active.length > 1); }).join("") + "</div>";
     } else if (arch.length) {
-      body = '<div class="all-done-note">' + svg("check", "ico-sm") + "Tutti i progetti sono archiviati.</div>";
+      body = '<div class="all-done-note">' + svg("check", "ico-sm") + "Tutti i progetti sono realizzati 🎉</div>";
     } else {
       body = emptyState("bulb", "Nessun progetto", "Annota il tuo primo progetto con il pulsante +.");
     }
-    var archHtml = collapsibleDone("arch", state.archOpen, "Archiviati", arch, function (i) { return ideaCard(i, false); });
+    var archHtml = collapsibleDone("arch", state.archOpen, "Realizzati", arch, function (i) { return ideaCard(i, false); });
     return listToolbar("", "idea") + body + archHtml + fab("add-idea", "Aggiungi progetto");
   }
 
@@ -1218,14 +1232,16 @@
   // (cambio rapido senza aprire il menu di modifica).
   function taskStatusSwitcher(t) {
     return statusSegBar("set-task-status", t.id, t.status,
-      ["da_fare", "in_corso", "in_attesa", "fatto"], STATUS_LABEL, "Stato del lavoro");
+      ["da_fare", "in_corso", "in_attesa", "fatto"], STATUS_LABEL, "Stato del lavoro", "--stato-");
   }
 
   // Barra di stato del dettaglio: stesso componente "segmented" con indicatore
   // scorrevole/trascinabile della barra filtri Lavori, ma a 4 segmenti di pari
-  // larghezza che ci stanno sempre senza scroll orizzontale.
-  function statusSegBar(action, id, current, opts, labels, aria) {
-    return '<div class="segmented seg-status seg-drag" id="status-bar" role="group" aria-label="' + aria + '">' +
+  // larghezza che ci stanno sempre senza scroll orizzontale. Il thumb prende il
+  // colore dello stato attivo (--seg-c → variabile di tema dello stato).
+  function statusSegBar(action, id, current, opts, labels, aria, varPrefix) {
+    return '<div class="segmented seg-status seg-drag" id="status-bar" role="group" aria-label="' + aria + '"' +
+        ' data-varprefix="' + varPrefix + '" style="--seg-c: var(' + varPrefix + current + ')">' +
       '<span class="seg-thumb" aria-hidden="true"></span>' +
       opts.map(function (s) {
         var on = current === s;
@@ -1299,7 +1315,7 @@
   // Selettore di stato del progetto: stessa barra segmentata del lavoro.
   function ideaStatusSwitcher(i) {
     return statusSegBar("set-idea-status", i.id, i.status,
-      ["bozza", "da_valutare", "approvata", "archiviata"], IDEA_LABEL, "Stato del progetto");
+      ["bozza", "wip", "realizzato"], IDEA_LABEL, "Stato del progetto", "--idea-");
   }
 
   // Riquadro "Spesa collegata" riutilizzabile (lavoro/idea)
@@ -1907,8 +1923,8 @@
       case "edit-task": openTaskModal(findTask(id), null); break;
       case "set-task-status":
       case "set-idea-status":
-        if (Date.now() < segSuppressUntil) break; // arriva da un drag: già gestito
-        applyStatusFromBtn(node);
+        if (Date.now() < segSuppressUntil) break; // arriva da un pointer: già gestito
+        setStatusInPlace(node);
         break;
       case "del-task": {
         var t = findTask(id);

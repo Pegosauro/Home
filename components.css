@@ -215,7 +215,7 @@
 .sort-opt-main { display: flex; flex-direction: column; gap: 2px; }
 .sort-opt-hint { font-size: 12px; font-weight: 500; color: var(--text-mut); }
 
-/* ---------------- SEZIONE COMPRIMIBILE (Completati / Archiviate) ---------------- */
+/* ---------------- SEZIONE COMPRIMIBILE (Completati / Realizzati) ---------------- */
 .done-section { margin-top: 18px; }
 .done-toggle {
   display: flex;
@@ -310,7 +310,7 @@
 /* Selettore stato: stessa barra segmentata dei filtri Lavori, ma a 4 segmenti
    di pari larghezza che ci stanno sempre (niente scroll orizzontale). Le voci
    con etichette lunghe vanno a capo invece di troncare o far scorrere. */
-.seg-status { overflow-x: visible; }
+.seg-status { overflow-x: visible; --seg-c: var(--accent); }
 .seg-status .seg-btn {
   flex: 1 1 0;
   min-width: 0;
@@ -320,6 +320,13 @@
   line-height: 1.12;
   white-space: normal;
   text-align: center;
+}
+/* Il thumb assume il colore dello stato attivo (--seg-c, impostato via JS al
+   cambio stato) ed esegue una transizione morbida anche sul colore. */
+.seg-status .seg-thumb {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--seg-c) 85%, #fff 15%), var(--seg-c));
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--seg-c) 55%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.42s cubic-bezier(0.34, 1.4, 0.6, 1), width 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Pulsante "Modifica" nella card dettaglio + "Elimina" tenue in fondo pagina */
@@ -346,11 +353,10 @@
 }
 .detail-delete:active { background: var(--danger-weak); }
 
-/* Stati idea */
-.badge-idea-bozza       { color: var(--idea-bozza);       background: color-mix(in srgb, var(--idea-bozza) 18%, transparent); }
-.badge-idea-da_valutare { color: var(--idea-da_valutare); background: color-mix(in srgb, var(--idea-da_valutare) 16%, transparent); }
-.badge-idea-approvata   { color: var(--idea-approvata);   background: color-mix(in srgb, var(--idea-approvata) 16%, transparent); }
-.badge-idea-archiviata  { color: var(--idea-archiviata);  background: color-mix(in srgb, var(--idea-archiviata) 16%, transparent); }
+/* Stati progetto (Bozza / WIP / Realizzato) */
+.badge-idea-bozza      { color: var(--idea-bozza);      background: color-mix(in srgb, var(--idea-bozza) 18%, transparent); }
+.badge-idea-wip        { color: var(--idea-wip);        background: color-mix(in srgb, var(--idea-wip) 16%, transparent); }
+.badge-idea-realizzato { color: var(--idea-realizzato); background: color-mix(in srgb, var(--idea-realizzato) 16%, transparent); }
 
 .badge-soft { background: var(--accent-weak); color: var(--accent); }
 
