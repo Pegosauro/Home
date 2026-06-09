@@ -307,36 +307,20 @@
   font-size: 12.5px; font-weight: 700; color: var(--text-mut);
   text-transform: uppercase; letter-spacing: 0.03em;
 }
-/* Selettore stato: griglia 2×2 a larghezza piena (segmenti, non pillole) */
-.status-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.status-chip {
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  height: 44px; padding: 0 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-mut);
-  font-size: 13.5px; font-weight: 650;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+/* Selettore stato: stessa barra segmentata dei filtri Lavori, ma a 4 segmenti
+   di pari larghezza che ci stanno sempre (niente scroll orizzontale). Le voci
+   con etichette lunghe vanno a capo invece di troncare o far scorrere. */
+.seg-status { overflow-x: visible; }
+.seg-status .seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 6px;
+  font-size: 12.5px;
+  line-height: 1.12;
+  white-space: normal;
+  text-align: center;
 }
-.status-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); }
-.status-chip.is-active {
-  border-color: transparent;
-  box-shadow: inset 0 0 0 1.5px currentColor;
-  font-weight: 700;
-}
-.status-chip.is-active .dot { background: currentColor; }
-.status-chip:active { transform: scale(0.97); }
-/* Colore dello stato attivo (specificità alta per vincere su .status-chip) */
-.status-chip.is-active.badge-stato-da_fare   { color: var(--stato-da_fare);   background: color-mix(in srgb, var(--stato-da_fare) 18%, transparent); }
-.status-chip.is-active.badge-stato-in_corso  { color: var(--stato-in_corso);  background: color-mix(in srgb, var(--stato-in_corso) 18%, transparent); }
-.status-chip.is-active.badge-stato-in_attesa { color: var(--stato-in_attesa); background: color-mix(in srgb, var(--stato-in_attesa) 18%, transparent); }
-.status-chip.is-active.badge-stato-fatto     { color: var(--stato-fatto);     background: color-mix(in srgb, var(--stato-fatto) 18%, transparent); }
-.status-chip.is-active.badge-idea-bozza       { color: var(--idea-bozza);       background: color-mix(in srgb, var(--idea-bozza) 18%, transparent); }
-.status-chip.is-active.badge-idea-da_valutare { color: var(--idea-da_valutare); background: color-mix(in srgb, var(--idea-da_valutare) 18%, transparent); }
-.status-chip.is-active.badge-idea-approvata   { color: var(--idea-approvata);   background: color-mix(in srgb, var(--idea-approvata) 18%, transparent); }
-.status-chip.is-active.badge-idea-archiviata  { color: var(--idea-archiviata);  background: color-mix(in srgb, var(--idea-archiviata) 18%, transparent); }
 
 /* Pulsante "Modifica" nella card dettaglio + "Elimina" tenue in fondo pagina */
 /* Icone azioni in testata dettaglio (usate ancora dal dettaglio Idea) */

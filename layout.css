@@ -76,24 +76,13 @@
 }
 .gd-dot .ico { width: 23px; height: 23px; }
 .gd-dot.is-on { color: var(--success); }
+/* nuvola verde con leggero alone luminoso quando il backup è attivo */
+.gd-dot.is-on .ico { filter: drop-shadow(0 0 5px var(--success)); }
 .gd-dot:active { background: var(--surface-2); }
-/* pallino di stato in basso a destra dell'icona nuvola */
-.gd-dot::after {
-  content: "";
-  position: absolute;
-  right: 4px;
-  bottom: 5px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  border: 2px solid var(--header-bg);
-  background: var(--text-faint);
-}
-.gd-dot.is-on::after { background: var(--success); }
 /* Su header colorato della stanza: icona chiara per contrasto */
 .app-header.is-room .gd-dot { color: rgba(255, 255, 255, 0.9); }
 .app-header.is-room .gd-dot.is-on { color: #aef5cb; }
-.app-header.is-room .gd-dot::after { border-color: rgba(0, 0, 0, 0.2); }
+.app-header.is-room .gd-dot.is-on .ico { filter: drop-shadow(0 0 6px #aef5cb); }
 
 /* ---------- AREA VISTA ---------- */
 .view {

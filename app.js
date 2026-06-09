@@ -11,7 +11,7 @@
      ========================================================== */
   var CONFIG = {
     STORAGE_KEY: "casa-app-v2-data",
-    VERSION: "2.9.0",
+    VERSION: "2.9.1",
     DEFAULT_ACCENT: "#218bff",
     ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
     ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"],
@@ -154,6 +154,7 @@
   var pendingConfirm = null; // callback conferma azione distruttiva
   var pendingCancel = null;
   var segSuppressUntil = 0;  // ignora il click sintetico dopo un drag della barra filtri
+  var pendingStatusSlide = null; // stato di partenza per far scivolare il thumb dopo un re-render
 
   // Riferimenti DOM principali
   var elHeader, elView, elNav, elToast, elModal;
@@ -551,7 +552,7 @@
       window.scrollTo(0, 0);
       animateIn();
     }
-    setupSegDrag();
+    initSegBars();
   }
   var keepScroll = false;
 
@@ -606,11 +607,33 @@
     else bar.scrollLeft = target;
   }
 
-  // Indicatore scorrevole + trascinabile per la barra filtri Lavori (#prio-bar).
-  // Tap: gestito dal click (data-action). Drag: gestito qui, con snap al rilascio.
-  function setupSegDrag() {
-    var bar = document.getElementById("prio-bar");
-    if (!bar) return;
+  // Inizializza tutte le barre "segmented" trascinabili presenti nella vista:
+  // il filtro priorità dei Lavori (#prio-bar) e il selettore di stato del
+  // dettaglio (#status-bar). Condividono il thumb scorrevole; cambia solo cosa
+  // succede al rilascio (filtro lista vs. cambio stato).
+  function initSegBars() {
+    var prio = document.getElementById("prio-bar");
+    if (prio) setupSegBar(prio, function (target) {
+      if (target.getAttribute("data-prio") === state.filterPrio) return; // già attivo
+      state.filterPrio = target.getAttribute("data-prio");
+      var bs = prio.querySelectorAll(".seg-btn");
+      for (var i = 0; i < bs.length; i++) bs[i].classList.toggle("is-active", bs[i] === target);
+      refreshLavoriList();              // prima la lista (layout stabile, dissolvenza voce per voce)
+      segPlaceThumb(prio, target, true); // poi il thumb scivola sulla voce scelta
+    });
+
+    var status = document.getElementById("status-bar");
+    // applyStatusFromBtn fa un render() completo: il thumb scivolerà comunque
+    // grazie a pendingStatusSlide (posizione di partenza ricordata).
+    if (status) setupSegBar(status, function (target) { applyStatusFromBtn(target); }, pendingStatusSlide);
+    pendingStatusSlide = null;
+  }
+
+  // Plumbing condiviso del thumb (posizionamento iniziale + drag con snap).
+  // onSelect(targetBtn) viene chiamato al commit (tap o drag); animateFromStatus,
+  // se valorizzato, fa partire il thumb dal segmento del vecchio stato e lo fa
+  // scivolare su quello attivo (usato dopo il re-render del dettaglio).
+  function setupSegBar(bar, onSelect, animateFromStatus) {
     var thumb = bar.querySelector(".seg-thumb");
     if (!thumb) return;
 
@@ -625,24 +648,26 @@
       }
       return best;
     }
-
-    // Applica un filtro (da TAP o da DRAG): aggiorna stato e classi, fa scivolare
-    // il thumb sulla voce scelta, poi ricarica la lista con la dissolvenza voce per voce.
     function selectBtn(target) {
       if (!target) return;
       segSuppressUntil = Date.now() + 500; // assorbe l'eventuale click sintetico post-pointer
-      if (target.getAttribute("data-prio") === state.filterPrio) return; // già attivo: nessun reload
-      state.filterPrio = target.getAttribute("data-prio");
-      var bs = bar.querySelectorAll(".seg-btn");
-      for (var i = 0; i < bs.length; i++) bs[i].classList.toggle("is-active", bs[i] === target);
-      refreshLavoriList();        // prima aggiorna la lista (layout stabile) e la dissolve voce per voce
-      placeThumb(target, true);   // poi il thumb scivola alla voce, con un leggero rimbalzo
+      onSelect(target);
     }
 
     // Posizione iniziale del thumb dopo che layout e testi sono stabili
     // (evita misure sbagliate durante l'entrata della vista).
     requestAnimationFrame(function () {
-      requestAnimationFrame(function () { placeThumb(activeBtn(), false); });
+      requestAnimationFrame(function () {
+        if (animateFromStatus != null) {
+          var from = bar.querySelector('[data-status="' + animateFromStatus + '"]');
+          if (from) {
+            placeThumb(from, false); // parti dal vecchio stato...
+            requestAnimationFrame(function () { placeThumb(activeBtn(), true); }); // ...e scivola sul nuovo
+            return;
+          }
+        }
+        placeThumb(activeBtn(), false);
+      });
     });
 
     var dragging = false, moved = false, startX = 0, thumbStart = 0, thumbW = 0, pressedBtn = null;
@@ -691,6 +716,33 @@
     bar.addEventListener("pointercancel", function (e) { finish(e, false); });
   }
 
+  // Applica il cambio di stato (lavoro/idea) da un bottone della barra di stato.
+  // Ricorda lo stato di partenza in pendingStatusSlide così, dopo il render(),
+  // il thumb scivola dal vecchio al nuovo segmento.
+  function applyStatusFromBtn(btn) {
+    var action = btn.getAttribute("data-action");
+    var id = btn.getAttribute("data-id");
+    var ns = btn.getAttribute("data-status");
+    if (action === "set-task-status") {
+      var t = findTask(id);
+      if (t && t.status !== ns) {
+        pendingStatusSlide = t.status;
+        var wasDone = t.status === "fatto";
+        t.status = ns; t.updatedAt = nowISO();
+        if (ns === "fatto" && !wasDone) t.completedAt = nowISO();
+        if (ns !== "fatto") t.completedAt = null;
+        persist(); render();
+      }
+    } else if (action === "set-idea-status") {
+      var i = findIdea(id);
+      if (i && i.status !== ns) {
+        pendingStatusSlide = i.status;
+        i.status = ns; i.updatedAt = nowISO();
+        persist(); render();
+      }
+    }
+  }
+
   // Intestazione colorata della stanza (fusa con la barra) + offset vista
   function applyHeaderRoom(route) {
     // L'header colorato è solo per la pagina stanza (un solo colore per stanza).
@@ -729,6 +781,12 @@
     return '<button class="header-btn" data-action="' + backAction + '" aria-label="Indietro">' + svg("back") + "</button>" +
       '<div class="grow"><div class="header-title">' + h(title) + "</div></div>";
   }
+  // Header del dettaglio: solo freccia indietro. Il titolo, completo e senza
+  // troncamenti, vive una volta sola dentro la card di dettaglio.
+  function backOnlyHeaderHtml(backAction) {
+    return '<button class="header-btn" data-action="' + backAction + '" aria-label="Indietro">' + svg("back") + "</button>" +
+      '<div class="grow"></div>';
+  }
 
   // Segnalino discreto (in alto a destra) dello stato Google Drive.
   // Tocco: se collegato → opzioni backup; se scollegato → login rapido.
@@ -749,11 +807,9 @@
             svg("layers", "ico-sm") + '<span>' + h(floorNameOf(r.floorId)) + "</span>")
         : slimHeaderHtml("back-home", "Stanza");
     } else if (route.name === "lavoro") {
-      var t = findTask(route.param);
-      inner = slimHeaderHtml("back-task", t ? t.title : "Lavoro");
+      inner = backOnlyHeaderHtml("back-task");
     } else if (route.name === "idea") {
-      var idd = findIdea(route.param);
-      inner = slimHeaderHtml("back-idea", idd ? idd.title : "Idea");
+      inner = backOnlyHeaderHtml("back-idea");
     } else if (route.name === "opzioni" && route.param) {
       // Sotto-sezione di Opzioni: header con freccia indietro al menu Opzioni.
       inner = slimHeaderHtml("opzioni-root", OPT_SECTIONS[route.param] || "Opzioni");
@@ -1161,13 +1217,21 @@
   // Selettore di stato del lavoro, toccabile dalla pagina di dettaglio
   // (cambio rapido senza aprire il menu di modifica).
   function taskStatusSwitcher(t) {
-    var opts = ["da_fare", "in_corso", "in_attesa", "fatto"];
-    return '<div class="status-switch" role="group" aria-label="Stato del lavoro">' +
+    return statusSegBar("set-task-status", t.id, t.status,
+      ["da_fare", "in_corso", "in_attesa", "fatto"], STATUS_LABEL, "Stato del lavoro");
+  }
+
+  // Barra di stato del dettaglio: stesso componente "segmented" con indicatore
+  // scorrevole/trascinabile della barra filtri Lavori, ma a 4 segmenti di pari
+  // larghezza che ci stanno sempre senza scroll orizzontale.
+  function statusSegBar(action, id, current, opts, labels, aria) {
+    return '<div class="segmented seg-status seg-drag" id="status-bar" role="group" aria-label="' + aria + '">' +
+      '<span class="seg-thumb" aria-hidden="true"></span>' +
       opts.map(function (s) {
-        var on = t.status === s;
-        return '<button class="status-chip' + (on ? " is-active badge-stato-" + s : "") + '" ' +
-          'data-action="set-task-status" data-id="' + t.id + '" data-status="' + s + '" aria-pressed="' + on + '">' +
-          '<span class="dot"></span>' + STATUS_LABEL[s] + "</button>";
+        var on = current === s;
+        return '<button class="seg-btn' + (on ? " is-active" : "") + '" ' +
+          'data-action="' + action + '" data-id="' + id + '" data-status="' + s + '" aria-pressed="' + on + '">' +
+          labels[s] + "</button>";
       }).join("") + "</div>";
   }
 
@@ -1232,16 +1296,10 @@
       '<button class="detail-delete" data-action="del-idea" data-id="' + i.id + '">' + svg("trash", "ico-sm") + "Elimina progetto</button>";
   }
 
-  // Selettore di stato del progetto (griglia 2×2), come quello del lavoro.
+  // Selettore di stato del progetto: stessa barra segmentata del lavoro.
   function ideaStatusSwitcher(i) {
-    var opts = ["bozza", "da_valutare", "approvata", "archiviata"];
-    return '<div class="status-switch" role="group" aria-label="Stato del progetto">' +
-      opts.map(function (s) {
-        var on = i.status === s;
-        return '<button class="status-chip' + (on ? " is-active badge-idea-" + s : "") + '" ' +
-          'data-action="set-idea-status" data-id="' + i.id + '" data-status="' + s + '" aria-pressed="' + on + '">' +
-          '<span class="dot"></span>' + IDEA_LABEL[s] + "</button>";
-      }).join("") + "</div>";
+    return statusSegBar("set-idea-status", i.id, i.status,
+      ["bozza", "da_valutare", "approvata", "archiviata"], IDEA_LABEL, "Stato del progetto");
   }
 
   // Riquadro "Spesa collegata" riutilizzabile (lavoro/idea)
@@ -1847,24 +1905,11 @@
       case "add-task": openTaskModal(null, null); break;
       case "add-task-room": openTaskModal(null, node.getAttribute("data-room")); break;
       case "edit-task": openTaskModal(findTask(id), null); break;
-      case "set-task-status": {
-        var tss = findTask(id);
-        var ns = node.getAttribute("data-status");
-        if (tss && tss.status !== ns) {
-          var wasDone = tss.status === "fatto";
-          tss.status = ns; tss.updatedAt = nowISO();
-          if (ns === "fatto" && !wasDone) tss.completedAt = nowISO();
-          if (ns !== "fatto") tss.completedAt = null;
-          persist(); render();
-        }
+      case "set-task-status":
+      case "set-idea-status":
+        if (Date.now() < segSuppressUntil) break; // arriva da un drag: già gestito
+        applyStatusFromBtn(node);
         break;
-      }
-      case "set-idea-status": {
-        var isd = findIdea(id);
-        var nis = node.getAttribute("data-status");
-        if (isd && isd.status !== nis) { isd.status = nis; isd.updatedAt = nowISO(); persist(); render(); }
-        break;
-      }
       case "del-task": {
         var t = findTask(id);
         openConfirm({
