@@ -1,6 +1,6 @@
 ========================================
  HOME APP — Istruzioni
- Versione 2.7.0
+ Versione 2.8.0
 ========================================
 
 Home App è una web app statica (PWA leggera) per gestire lavori di casa,
@@ -117,7 +117,7 @@ Quando esce una nuova versione, in basso compare l'avviso
 l'app si ricarica già aggiornata. I tuoi dati NON vengono toccati.
 
 PER CHI PUBBLICA: a ogni rilascio cambia la riga
-   var CACHE_VERSION = "casa-app-2.7.0";
+   var CACHE_VERSION = "casa-app-2.8.0";
 in cima al file sw.js (es. "casa-app-2.7.1"). È questo cambio che fa
 scattare l'avviso di aggiornamento sui dispositivi. Ricordati di
 caricare ANCHE sw.js insieme agli altri file su GitHub Pages.

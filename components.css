@@ -121,6 +121,54 @@
   align-self: center;
 }
 
+/* ---------------- SWIPE-TO-DELETE (righe spesa + card lavori/idee) ----------------
+   La superficie (.swipe-surface) scorre a sinistra e rivela il pulsante Elimina
+   che le sta DIETRO (z-index). A riposo il pulsante è invisibile (opacity:0) e
+   completamente coperto: niente bordi rossi che spuntano agli angoli. */
+.swipe-surface {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;            /* lo scroll verticale resta nativo */
+  will-change: transform;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.swipe-surface.swiping { transition: none; }   /* segue il dito senza ritardo */
+.swipe-surface.is-swiped { transform: translateX(-96px); }
+
+.swipe-del {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 84px;
+  z-index: 0;                     /* dietro la superficie */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-1);
+  opacity: 0;                     /* invisibile finché non si scorre */
+  transition: opacity 0.14s linear;
+}
+.swipe-del .ico { width: 18px; height: 18px; }
+.swipe-surface.swiping ~ .swipe-del,
+.swipe-surface.is-swiped ~ .swipe-del { opacity: 1; }
+
+/* Strato interno opaco delle card lavoro/idea: contiene il contenuto e scorre
+   nello swipe coprendo del tutto il pulsante Elimina a riposo. */
+.card-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 13px;
+  background: linear-gradient(180deg, var(--card-top), transparent 58%), var(--surface);
+}
+
 /* ---------------- ORDINA (toolbar + menu) ---------------- */
 /* Riga in cima alla lista: filtro a sinistra + pulsante tondo "Ordina" a destra */
 .list-toolbar {
@@ -254,31 +302,61 @@
 .badge-stato-fatto     { color: var(--stato-fatto);     background: color-mix(in srgb, var(--stato-fatto) 16%, transparent); }
 
 /* Selettore di stato toccabile (pagina dettaglio lavoro) */
-.detail-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.detail-status { display: flex; flex-direction: column; gap: 9px; }
 .detail-status-label {
   font-size: 12.5px; font-weight: 700; color: var(--text-mut);
   text-transform: uppercase; letter-spacing: 0.03em;
 }
-.status-switch { display: flex; gap: 7px; flex-wrap: wrap; }
+/* Selettore stato: griglia 2×2 a larghezza piena (segmenti, non pillole) */
+.status-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .status-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 32px; padding: 0 13px;
-  border-radius: var(--radius-pill);
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 44px; padding: 0 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-mut);
-  font-size: 13px; font-weight: 650;
+  font-size: 13.5px; font-weight: 650;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.status-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+.status-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); }
 .status-chip.is-active {
   border-color: transparent;
-  box-shadow: inset 0 0 0 1px currentColor;
+  box-shadow: inset 0 0 0 1.5px currentColor;
   font-weight: 700;
 }
 .status-chip.is-active .dot { background: currentColor; }
-.status-chip:active { transform: scale(0.96); }
+.status-chip:active { transform: scale(0.97); }
+/* Colore dello stato attivo (specificità alta per vincere su .status-chip) */
+.status-chip.is-active.badge-stato-da_fare   { color: var(--stato-da_fare);   background: color-mix(in srgb, var(--stato-da_fare) 18%, transparent); }
+.status-chip.is-active.badge-stato-in_corso  { color: var(--stato-in_corso);  background: color-mix(in srgb, var(--stato-in_corso) 18%, transparent); }
+.status-chip.is-active.badge-stato-in_attesa { color: var(--stato-in_attesa); background: color-mix(in srgb, var(--stato-in_attesa) 18%, transparent); }
+.status-chip.is-active.badge-stato-fatto     { color: var(--stato-fatto);     background: color-mix(in srgb, var(--stato-fatto) 18%, transparent); }
+
+/* Pulsante "Modifica" nella card dettaglio + "Elimina" tenue in fondo pagina */
+/* Icone azioni in testata dettaglio (usate ancora dal dettaglio Idea) */
+.task-actions { display: flex; gap: 7px; margin-left: auto; }
+
+.detail-edit { margin-top: 4px; }
+.detail-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0 8px;
+  padding: 13px;
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+.detail-delete:active { background: var(--danger-weak); }
 
 /* Stati idea */
 .badge-idea-bozza       { color: var(--idea-bozza);       background: color-mix(in srgb, var(--idea-bozza) 18%, transparent); }

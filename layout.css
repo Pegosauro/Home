@@ -61,6 +61,40 @@
 }
 .header-btn:active { background: var(--surface-3); }
 
+/* Segnalino stato Google Drive (in alto a destra dell'header) */
+.gd-dot {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+}
+.gd-dot .ico { width: 23px; height: 23px; }
+.gd-dot.is-on { color: var(--success); }
+.gd-dot:active { background: var(--surface-2); }
+/* pallino di stato in basso a destra dell'icona nuvola */
+.gd-dot::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--header-bg);
+  background: var(--text-faint);
+}
+.gd-dot.is-on::after { background: var(--success); }
+/* Su header colorato della stanza: icona chiara per contrasto */
+.app-header.is-room .gd-dot { color: rgba(255, 255, 255, 0.9); }
+.app-header.is-room .gd-dot.is-on { color: #aef5cb; }
+.app-header.is-room .gd-dot::after { border-color: rgba(0, 0, 0, 0.2); }
+
 /* ---------- AREA VISTA ---------- */
 .view {
   width: 100%;

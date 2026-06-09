@@ -11,7 +11,7 @@
      ========================================================== */
   var CONFIG = {
     STORAGE_KEY: "casa-app-v2-data",
-    VERSION: "2.7.0",
+    VERSION: "2.8.0",
     DEFAULT_ACCENT: "#218bff",
     ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
     ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"],
@@ -143,12 +143,12 @@
   var state = {
     data: null,            // dati applicativi (vedi DATA MODEL)
     filterPrio: "tutti",   // filtro corrente sezione LAVORI
-    shopFilter: "tutte",   // filtro categoria sezione SPESA
     currentTaskId: null,   // lavoro aperto nella pagina dettaglio
     currentIdeaId: null,   // idea aperta nella pagina dettaglio
     manageFloorId: null,   // piano in gestione (drill-down stanze in Opzioni)
     doneOpen: false,       // sezione "Completati" (Lavori) espansa
-    archOpen: false        // sezione "Archiviate" (Idee) espansa
+    archOpen: false,       // sezione "Archiviate" (Idee) espansa
+    boughtOpen: false      // sezione "Presi" (Spesa) espansa
   };
 
   var pendingConfirm = null; // callback conferma azione distruttiva
@@ -542,11 +542,18 @@
       default: navigate("#home"); return;
     }
     elView.innerHTML = body;
-    window.scrollTo(0, 0);
-    animateIn();
+    // keepScroll: usato dai toggle delle sezioni comprimibili (Presi/Completati/
+    // Archiviate) per espandere/chiudere SENZA saltare in cima né rifare la
+    // dissolvenza d'entrata.
+    if (keepScroll) {
+      keepScroll = false;
+    } else {
+      window.scrollTo(0, 0);
+      animateIn();
+    }
     setupSegDrag();
-    setupSegSlide();
   }
+  var keepScroll = false;
 
   // Cascata d'entrata: ogni voce di lista (.stack) entra con un piccolo ritardo
   // progressivo; i contenitori che racchiudono liste vengono attraversati; gli
@@ -684,20 +691,6 @@
     bar.addEventListener("pointercancel", function (e) { finish(e, false); });
   }
 
-  // Indicatore scorrevole per la barra filtri Spesa (#shop-bar). Qui NON c'è il
-  // drag-per-selezionare (la barra scorre in orizzontale): la selezione è a tap
-  // (gestita dal click → filter-shop), col thumb che scivola e leggero rimbalzo.
-  function setupSegSlide() {
-    var bar = document.getElementById("shop-bar");
-    if (!bar || !bar.querySelector(".seg-thumb")) return;
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        segPlaceThumb(bar, segActiveBtn(bar), false);
-        segCenterActive(bar, false);
-      });
-    });
-  }
-
   // Intestazione colorata della stanza (fusa con la barra) + offset vista
   function applyHeaderRoom(route) {
     // L'header colorato è solo per la pagina stanza (un solo colore per stanza).
@@ -737,27 +730,38 @@
       '<div class="grow"><div class="header-title">' + h(title) + "</div></div>";
   }
 
+  // Segnalino discreto (in alto a destra) dello stato Google Drive.
+  // Tocco: se collegato → opzioni backup; se scollegato → login rapido.
+  function gdIndicatorHtml() {
+    if (!gdConfigured()) return "";
+    var on = gdConnected();
+    return '<button class="gd-dot ' + (on ? "is-on" : "is-off") + '" data-action="gd-indicator" ' +
+      'aria-label="' + (on ? "Google Drive collegato" : "Google Drive scollegato — tocca per accedere") + '">' +
+      svg("cloud") + "</button>";
+  }
+
   function headerHtml(route) {
+    var inner;
     if (route.name === "stanza") {
       var r = findRoom(route.param);
-      if (!r) return slimHeaderHtml("back-home", "Stanza");
-      return coloredHeaderHtml("back-home", roomIcon(r.icon), r.name,
-        svg("layers", "ico-sm") + '<span>' + h(floorNameOf(r.floorId)) + "</span>");
-    }
-    if (route.name === "lavoro") {
+      inner = r
+        ? coloredHeaderHtml("back-home", roomIcon(r.icon), r.name,
+            svg("layers", "ico-sm") + '<span>' + h(floorNameOf(r.floorId)) + "</span>")
+        : slimHeaderHtml("back-home", "Stanza");
+    } else if (route.name === "lavoro") {
       var t = findTask(route.param);
-      return slimHeaderHtml("back-task", t ? t.title : "Lavoro");
-    }
-    if (route.name === "idea") {
+      inner = slimHeaderHtml("back-task", t ? t.title : "Lavoro");
+    } else if (route.name === "idea") {
       var idd = findIdea(route.param);
-      return slimHeaderHtml("back-idea", idd ? idd.title : "Idea");
+      inner = slimHeaderHtml("back-idea", idd ? idd.title : "Idea");
+    } else if (route.name === "opzioni" && route.param) {
+      // Sotto-sezione di Opzioni: header con freccia indietro al menu Opzioni.
+      inner = slimHeaderHtml("opzioni-root", OPT_SECTIONS[route.param] || "Opzioni");
+    } else {
+      var titles = { home: "La mia casa", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
+      inner = '<div class="grow"><div class="header-title">' + titles[route.name] + "</div></div>";
     }
-    // Sotto-sezione di Opzioni: header con freccia indietro al menu Opzioni.
-    if (route.name === "opzioni" && route.param) {
-      return slimHeaderHtml("opzioni-root", OPT_SECTIONS[route.param] || "Opzioni");
-    }
-    var titles = { home: "Home App", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
-    return '<div class="grow"><div class="header-title">' + titles[route.name] + "</div></div>";
+    return inner + gdIndicatorHtml();
   }
 
   var NAV_ITEMS = [
@@ -871,24 +875,6 @@
 
   // ---------- HOME ----------
   function viewHome() {
-    var tasks = state.data.tasks;
-    var total = tasks.length;
-    var open = tasks.filter(function (t) { return t.status !== "fatto"; }).length;
-    var alta = tasks.filter(function (t) { return t.priority === "alta" && t.status !== "fatto"; }).length;
-    var done = tasks.filter(function (t) { return t.status === "fatto"; }).length;
-    var overdue = tasks.filter(isOverdueOpen).length;
-    var ideasN = state.data.ideas.length;
-
-    var stats =
-      '<div class="stat-grid">' +
-        stat(total, "Lavori", "") +
-        stat(open, "Aperti", "accent") +
-        stat(alta, "Alta prio.", "alta") +
-        stat(overdue, "Scaduti", "scaduti") +
-        stat(done, "Completati", "fatto") +
-        stat(ideasN, "Idee", "") +
-      "</div>";
-
     var fl = floors();
     var floorsHtml = fl.map(function (f) {
       var rs = roomsOf(f.id);
@@ -901,26 +887,49 @@
         roomsHtml + "</div>";
     }).join("");
 
-    return '' +
-      '<section class="section">' + stats + "</section>" +
-      '<section class="section"><div class="section-head"><h2>La tua casa</h2></div>' + floorsHtml + "</section>";
+    return homeAlertHtml() + '<section class="section">' + floorsHtml + "</section>";
   }
 
-  function stat(val, label, mod) {
-    return '<div class="stat ' + mod + '"><span class="stat-val mono">' + val + '</span><span class="stat-lbl">' + label + "</span></div>";
+  // Striscia "in evidenza" in cima alla Home: appare SOLO se c'è qualcosa che
+  // richiede attenzione (lavori scaduti o ad alta priorità). Tocco → Lavori.
+  function homeAlertHtml() {
+    var open = state.data.tasks.filter(function (t) { return t.status !== "fatto"; });
+    var overdue = open.filter(isOverdueOpen).length;
+    var alta = open.filter(function (t) { return t.priority === "alta"; }).length;
+    if (!overdue && !alta) return "";
+    var parts = [];
+    if (overdue) parts.push(overdue === 1 ? "1 lavoro scaduto" : overdue + " lavori scaduti");
+    if (alta) parts.push((overdue ? alta : (alta === 1 ? "1 lavoro" : alta + " lavori")) + " ad alta priorità");
+    // Se ci sono scaduti porto alla lista completa (i badge li evidenziano),
+    // altrimenti filtro direttamente sull'alta priorità.
+    var prio = overdue ? "tutti" : "alta";
+    return '<button class="home-alert" data-action="go-attention" data-prio="' + prio + '">' +
+      '<span class="home-alert-ico">' + svg("alert") + "</span>" +
+      '<span class="home-alert-text">' + parts.join(" · ") + "</span>" +
+      '<span class="home-alert-chev">' + svg("chevron") + "</span>" +
+      "</button>";
   }
 
   function roomCard(r) {
-    var open = openTasksOf(r.id).length;
+    var openTasks = openTasksOf(r.id);
+    var open = openTasks.length;
     var ideasN = ideasOf(r.id).length;
+    var overdue = openTasks.filter(isOverdueOpen).length;
+    var alta = openTasks.filter(function (t) { return t.priority === "alta"; }).length;
+
     var pills = "";
+    // Segnale d'attenzione per primo: scaduti (più urgenti) o, in mancanza, alta priorità.
+    if (overdue > 0) pills += '<span class="count-pill is-danger">' + svg("alert", "ico-sm") + overdue + (overdue === 1 ? " scaduto" : " scaduti") + "</span>";
+    else if (alta > 0) pills += '<span class="count-pill is-danger">' + svg("alert", "ico-sm") + alta + (alta === 1 ? " urgente" : " urgenti") + "</span>";
     if (open > 0) pills += '<span class="count-pill">' + svg("tasks", "ico-sm") + open + " aperti</span>";
     if (ideasN > 0) pills += '<span class="count-pill">' + svg("bulb", "ico-sm") + ideasN + " idee</span>";
+    if (!pills) pills = '<span class="count-pill room-empty-hint">Tutto a posto</span>';
+
     return '<button class="card card-tap room-card" data-action="open-room" data-id="' + r.id + '">' +
       '<span class="room-ico" style="background:' + h(r.color) + '">' + svg(roomIcon(r.icon)) + "</span>" +
       '<span class="room-info">' +
         '<span class="room-name">' + h(r.name) + "</span>" +
-        (pills ? '<span class="room-counts">' + pills + "</span>" : "") +
+        '<span class="room-counts">' + pills + "</span>" +
       "</span>" +
       '<span class="room-chevron">' + svg("chevron") + "</span>" +
       "</button>";
@@ -1003,6 +1012,12 @@
     return '<button class="drag-handle card-drag" type="button" data-action="reorder-handle" aria-label="Trascina per riordinare">' + svg("grip") + "</button>";
   }
 
+  // Pulsante "Elimina" rivelato dallo swipe (riga spesa o card lavoro/idea).
+  function swipeDelBtn(action, id, label) {
+    return '<button class="swipe-del" data-action="' + action + '" data-id="' + id + '" aria-label="' + label + '">' +
+      svg("trash", "ico-sm") + "<span>Elimina</span></button>";
+  }
+
   function taskCard(t, draggable) {
     var chk = t.checklist || [];
     var doneN = chk.filter(function (c) { return c.done; }).length;
@@ -1013,17 +1028,17 @@
     var shopPill = shop.length
       ? '<span class="count-pill">' + svg("cart", "ico-sm") + shop.filter(function (s) { return !s.done; }).length + "/" + shop.length + "</span>"
       : "";
+    // .card resta il nodo riordinabile; .card-inner è la superficie che scorre.
     return '<div class="card card-tap task-card prio-' + t.priority + (draggable ? " is-reorderable" : "") + '" data-action="open-task" data-id="' + t.id + '">' +
-      '<div class="task-top">' +
-        (draggable ? dragHandleHtml() : "") +
-        '<span class="task-title' + (t.status === "fatto" ? " is-done" : "") + '">' + h(t.title) + "</span>" +
-        '<div class="task-actions">' +
-          iconBtn("edit-task", t.id, "pencil", "Modifica lavoro") +
-          iconBtn("del-task", t.id, "trash", "Elimina lavoro", true) +
+      '<div class="card-inner swipe-surface">' +
+        '<div class="task-top">' +
+          (draggable ? dragHandleHtml() : "") +
+          '<span class="task-title' + (t.status === "fatto" ? " is-done" : "") + '">' + h(t.title) + "</span>" +
         "</div>" +
+        '<div class="task-badges">' + (t.status === "fatto" ? "" : prioBadge(t.priority)) + statusBadge(t.status) + dueBadgeHtml(t) + chkPill + shopPill + "</div>" +
+        '<div class="task-loc">' + locCompactHtml(t.roomIds) + "</div>" +
       "</div>" +
-      '<div class="task-loc">' + locCompactHtml(t.roomIds) + "</div>" +
-      '<div class="task-badges">' + (t.status === "fatto" ? "" : prioBadge(t.priority)) + statusBadge(t.status) + dueBadgeHtml(t) + chkPill + shopPill + "</div>" +
+      swipeDelBtn("del-task", t.id, "Elimina lavoro") +
       "</div>";
   }
 
@@ -1059,17 +1074,16 @@
       : "";
     var costBadge = i.cost ? '<span class="badge badge-soft idea-cost">' + svg("coin", "ico-sm") + h(i.cost) + "</span>" : "";
     return '<div class="card card-tap idea-card' + (draggable ? " is-reorderable" : "") + '" data-action="open-idea" data-id="' + i.id + '">' +
-      '<div class="idea-top">' +
-        (draggable ? dragHandleHtml() : "") +
-        '<span class="idea-title">' + h(i.title) + "</span>" +
-        '<div class="idea-actions">' +
-          iconBtn("edit-idea", i.id, "pencil", "Modifica idea") +
-          iconBtn("del-idea", i.id, "trash", "Elimina idea", true) +
+      '<div class="card-inner swipe-surface">' +
+        '<div class="idea-top">' +
+          (draggable ? dragHandleHtml() : "") +
+          '<span class="idea-title">' + h(i.title) + "</span>" +
         "</div>" +
+        (i.description ? '<div class="idea-desc">' + h(i.description) + "</div>" : "") +
+        '<div class="idea-foot">' + ideaBadge(i.status) + costBadge + clistPill + shopPill + "</div>" +
+        '<div class="idea-loc">' + locCompactHtml(i.roomIds) + "</div>" +
       "</div>" +
-      '<div class="idea-loc">' + locCompactHtml(i.roomIds) + "</div>" +
-      (i.description ? '<div class="idea-desc">' + h(i.description) + "</div>" : "") +
-      '<div class="idea-foot">' + ideaBadge(i.status) + costBadge + clistPill + shopPill + "</div>" +
+      swipeDelBtn("del-idea", i.id, "Elimina idea") +
       "</div>";
   }
 
@@ -1123,13 +1137,7 @@
     var done = t.status === "fatto";
     var detail =
       '<div class="card detail-card">' +
-        '<div class="detail-top">' +
-          '<h1 class="detail-title' + (done ? " is-done" : "") + '">' + h(t.title) + "</h1>" +
-          '<div class="task-actions">' +
-            iconBtn("edit-task", t.id, "pencil", "Modifica lavoro") +
-            iconBtn("del-task", t.id, "trash", "Elimina lavoro", true) +
-          "</div>" +
-        "</div>" +
+        '<h1 class="detail-title' + (done ? " is-done" : "") + '">' + h(t.title) + "</h1>" +
         locChipsHtml(t.roomIds) +
         '<div class="task-badges">' + (done ? "" : prioBadge(t.priority)) + dueBadgeHtml(t) + "</div>" +
         '<div class="detail-status">' +
@@ -1137,6 +1145,7 @@
           taskStatusSwitcher(t) +
         "</div>" +
         (t.description ? '<p class="detail-desc">' + h(t.description) + "</p>" : "") +
+        '<button class="btn btn-block detail-edit" data-action="edit-task" data-id="' + t.id + '">' + svg("pencil") + "Modifica lavoro</button>" +
       "</div>";
 
     return detail +
@@ -1145,7 +1154,8 @@
       "</section>" +
       '<section class="section">' +
         shoppingLinkedBlock("task", t.id) +
-      "</section>";
+      "</section>" +
+      '<button class="detail-delete" data-action="del-task" data-id="' + t.id + '">' + svg("trash", "ico-sm") + "Elimina lavoro</button>";
   }
 
   // Selettore di stato del lavoro, toccabile dalla pagina di dettaglio
@@ -1228,7 +1238,7 @@
   function shoppingLinkedBlock(type, id) {
     var items = shoppingLinkedTo(type, id);
     var list = items.length
-      ? '<div class="stack">' + items.map(shopRow).join("") + "</div>"
+      ? '<div class="stack">' + items.map(function (s) { return shopItemHtml(s, false); }).join("") + "</div>"
       : '<p class="check-empty">Nessun articolo collegato. Aggiungi qui ciò che serve: finirà anche nella Lista spesa.</p>';
     return '<div class="section-head"><h2>Spesa collegata</h2>' +
         (items.length ? '<span class="check-count mono">' + items.filter(function (s) { return !s.done; }).length + " da prendere</span>" : "") + "</div>" +
@@ -1248,51 +1258,57 @@
         return '<option value="' + c.k + '"' + (c.k === current ? " selected" : "") + ">" + h(c.l) + "</option>";
       }).join("");
   }
-  function matchShopFilter(s) {
-    if (state.shopFilter === "tutte") return true;
-    if (state.shopFilter === "_none_") return !s.category;
-    return s.category === state.shopFilter;
-  }
-  function shopFilterBar(items) {
-    var present = {}, hasNone = false;
-    items.forEach(function (s) { if (s.category) present[s.category] = true; else hasNone = true; });
-    var cats = CONFIG.SHOP_CATEGORIES.filter(function (c) { return present[c.k]; });
-    if (cats.length === 0) return ""; // niente da filtrare
-    var segs = '<button class="seg-btn' + (state.shopFilter === "tutte" ? " is-active" : "") + '" data-action="filter-shop" data-cat="tutte">Tutte</button>';
-    cats.forEach(function (c) {
-      segs += '<button class="seg-btn' + (state.shopFilter === c.k ? " is-active" : "") + '" data-action="filter-shop" data-cat="' + c.k + '">' + h(c.l) + "</button>";
-    });
-    if (hasNone) segs += '<button class="seg-btn' + (state.shopFilter === "_none_" ? " is-active" : "") + '" data-action="filter-shop" data-cat="_none_">Senza categoria</button>';
-    return '<div class="segmented filter-bar seg-slide" id="shop-bar">' +
-      '<span class="seg-thumb" aria-hidden="true"></span>' + segs + "</div>";
-  }
-
-  // Solo il corpo della lista Spesa (sezioni "da prendere" e "Presi", filtrate):
-  // usato sia al primo render sia per l'aggiornamento mirato al cambio filtro.
+  // Corpo della lista Spesa: gli articoli "da prendere" raggruppati per
+  // categoria (= dove comprarli), poi la sezione comprimibile "Presi".
   function spesaListHtml() {
     var all = state.data.shopping.slice();
-    var todo = all.filter(function (s) { return !s.done && matchShopFilter(s); }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
-    var bought = all.filter(function (s) { return s.done && matchShopFilter(s); }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
-    return (todo.length ? '<div class="stack">' + todo.map(shopRow).join("") + "</div>"
-                        : '<p class="check-empty">Niente da prendere in questo filtro.</p>') +
-      (bought.length
-        ? '<div class="section-head" style="margin-top:20px"><h2>Presi</h2>' +
-            '<button class="btn btn-sm btn-ghost" data-action="clear-bought">Svuota presi</button></div>' +
-          '<div class="stack">' + bought.map(shopRow).join("") + "</div>"
-        : "");
-  }
-  function refreshSpesaList() {
-    var cont = document.getElementById("spesa-list");
-    if (!cont) { render(); return; }
-    cont.innerHTML = spesaListHtml();
-    cascade(cont);
-    window.scrollTo(0, 0);
+    var todo = all.filter(function (s) { return !s.done; })
+      .sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+    var bought = all.filter(function (s) { return s.done; })
+      .sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+
+    var out = "";
+    if (todo.length) {
+      // Un gruppo per categoria, nell'ordine di CONFIG.SHOP_CATEGORIES,
+      // più un gruppo finale "Senza categoria" per gli articoli sciolti.
+      var groups = [];
+      CONFIG.SHOP_CATEGORIES.forEach(function (c) {
+        var its = todo.filter(function (s) { return s.category === c.k; });
+        if (its.length) groups.push({ label: c.l, items: its });
+      });
+      var noCat = todo.filter(function (s) { return !s.category; });
+      if (noCat.length) groups.push({ label: "Senza categoria", items: noCat });
+
+      out += groups.map(function (g) {
+        return '<div class="shop-group">' +
+          '<div class="shop-group-head">' +
+            '<span class="shop-group-name">' + h(g.label) + "</span>" +
+            '<span class="shop-group-count mono">' + g.items.length + "</span>" +
+          "</div>" +
+          '<div class="stack">' + g.items.map(function (s) { return shopItemHtml(s, true); }).join("") + "</div>" +
+        "</div>";
+      }).join("");
+    } else if (bought.length) {
+      out += '<p class="check-empty">Tutto preso. Bel lavoro!</p>';
+    }
+
+    if (bought.length) {
+      out += '<div class="done-section">' +
+        '<button class="done-toggle' + (state.boughtOpen ? " is-open" : "") + '" data-action="toggle-bought">' +
+          svg("chevron", "ico-sm") + "<span>Presi (" + bought.length + ")</span>" +
+        "</button>" +
+        (state.boughtOpen
+          ? '<div class="stack done-stack">' + bought.map(function (s) { return shopItemHtml(s, false); }).join("") +
+              '<button class="btn btn-sm btn-ghost btn-block" data-action="clear-bought" style="margin-top:4px">Svuota presi</button>' +
+            "</div>"
+          : "") +
+      "</div>";
+    }
+    return out;
   }
 
   function viewSpesa() {
     var all = state.data.shopping.slice();
-    // Reset del filtro se la categoria selezionata non è più presente
-    if (state.shopFilter !== "tutte" && !all.some(matchShopFilter)) state.shopFilter = "tutte";
 
     var addForm =
       '<form class="shop-add" data-action="add-shop">' +
@@ -1308,25 +1324,36 @@
     if (all.length === 0) {
       body = emptyState("cart", "Lista vuota", "Aggiungi gli articoli che ti servono con il campo qui sopra.");
     } else {
-      body = shopFilterBar(all) + '<div id="spesa-list">' + spesaListHtml() + "</div>";
+      body = '<div id="spesa-list">' + spesaListHtml() + "</div>";
     }
 
     return '<div class="shop-addwrap">' + addForm + "</div>" + body;
   }
 
-  function shopRow(s) {
-    var cat = s.category ? '<span class="shop-cat">' + svg("bag", "ico-sm") + "<span>" + h(shopCatLabel(s.category)) + "</span></span>" : "";
+  // Riga spesa avvolta nello "swipe-wrap": scorrendola a sinistra compare il
+  // pulsante Elimina (niente cestino sempre in vista). hideCat nasconde il tag
+  // categoria quando è già implicito (lista raggruppata per categoria).
+  function shopItemHtml(s, hideCat) {
+    // La riga viene PRIMA del pulsante: così, con z-index, lo copre del tutto a
+    // riposo (niente rosso che spunta) e il selettore fratello lo rivela in swipe.
+    return '<div class="swipe-wrap">' +
+      shopRow(s, hideCat) +
+      swipeDelBtn("del-shop", s.id, "Elimina articolo") +
+    "</div>";
+  }
+
+  function shopRow(s, hideCat) {
+    var cat = (s.category && !hideCat) ? '<span class="shop-cat">' + svg("bag", "ico-sm") + "<span>" + h(shopCatLabel(s.category)) + "</span></span>" : "";
     var link = shopLinkTag(s);
     var tags = (cat || link) ? '<span class="shop-tags">' + cat + link + "</span>" : "";
     var note = s.note ? '<span class="shop-note">' + h(s.note) + "</span>" : "";
-    return '<div class="shop-row' + (s.done ? " is-done" : "") + '" data-action="open-shop" data-id="' + s.id + '">' +
+    return '<div class="shop-row swipe-surface' + (s.done ? " is-done" : "") + '" data-action="open-shop" data-id="' + s.id + '">' +
       '<button class="check-box' + (s.done ? " is-done" : "") + '" data-action="toggle-shop" data-id="' + s.id + '" aria-label="' + (s.done ? "Annulla" : "Segna come preso") + '">' + svg("check", "ico-sm") + "</button>" +
       '<span class="shop-main">' +
         '<span class="shop-text' + (s.done ? " is-done" : "") + '">' + h(s.text) + "</span>" +
         tags + note +
       "</span>" +
       (s.qty ? '<span class="shop-qty-badge mono">' + h(s.qty) + "</span>" : "") +
-      iconBtn("del-shop", s.id, "trash", "Elimina articolo", true) +
     "</div>";
   }
 
@@ -1757,6 +1784,8 @@
     switch (action) {
       /* --- navigazione --- */
       case "go": navigate("#" + node.getAttribute("data-route")); break;
+      case "go-attention": state.filterPrio = node.getAttribute("data-prio") || "tutti"; navigate("#lavori"); break;
+      case "gd-indicator": if (gdConnected()) navigate("#opzioni/backup"); else gdConnect(); break;
       case "go-opt": navigate("#opzioni/" + node.getAttribute("data-section")); break;
       case "opzioni-root": navigate("#opzioni"); break;
       case "open-room": navigate("#stanza/" + id); break;
@@ -1801,8 +1830,9 @@
       case "set-sort":
         setSort(node.getAttribute("data-kind"), node.getAttribute("data-sort"));
         closeModal(); render(); break;
-      case "toggle-done": state.doneOpen = !state.doneOpen; render(); break;
-      case "toggle-arch": state.archOpen = !state.archOpen; render(); break;
+      case "toggle-done": state.doneOpen = !state.doneOpen; keepScroll = true; render(); break;
+      case "toggle-arch": state.archOpen = !state.archOpen; keepScroll = true; render(); break;
+      case "toggle-bought": state.boughtOpen = !state.boughtOpen; keepScroll = true; render(); break;
       case "reorder-handle": break; // no-op: serve solo a non aprire il dettaglio
       case "add-task": openTaskModal(null, null); break;
       case "add-task-room": openTaskModal(null, node.getAttribute("data-room")); break;
@@ -1876,24 +1906,10 @@
       }
       case "open-shop": openShopModal(findShop(id)); break;
       case "save-shop": saveShop(node); break;
-      case "filter-shop": {
-        var newCat = node.getAttribute("data-cat");
-        if (newCat === state.shopFilter) break; // già attivo: nessun reload
-        state.shopFilter = newCat;
-        var sbar = document.getElementById("shop-bar");
-        if (sbar) {
-          var sbs = sbar.querySelectorAll(".seg-btn");
-          for (var si = 0; si < sbs.length; si++) sbs[si].classList.toggle("is-active", sbs[si] === node);
-          refreshSpesaList();                // prima la lista (layout stabile), dissolvenza voce per voce
-          segPlaceThumb(sbar, node, true);   // poi il thumb scivola con leggero rimbalzo
-          segCenterActive(sbar, true);       // porta in vista la categoria scelta
-        } else { render(); }
-        break;
-      }
       case "toggle-shop": { var sh = findShop(id); if (sh) { sh.done = !sh.done; persist(); render(); } break; }
       case "del-shop": {
         state.data.shopping = state.data.shopping.filter(function (x) { return x.id !== id; });
-        persist(); render();
+        persist(); toast("Articolo eliminato", "success"); render();
         break;
       }
       case "clear-bought": {
@@ -2717,6 +2733,12 @@
      BOOT — listener centralizzati + avvio
      ========================================================== */
   function onClick(e) {
+    if (swipeSuppressClick) { swipeSuppressClick = false; return; }
+    // Tocco su una riga/card già aperta dallo swipe: la richiude (non naviga).
+    if (e.target.closest) {
+      var openSurf = e.target.closest(".swipe-surface.is-swiped");
+      if (openSurf) { openSurf.classList.remove("is-swiped"); e.preventDefault(); return; }
+    }
     var node = e.target.closest ? e.target.closest("[data-action]") : null;
     if (!node) return;
     // Il data-action di un <form> serve SOLO all'evento submit: un click che
@@ -2740,6 +2762,18 @@
      di lavori e idee in ordinamento "Manuale" (.reorder-list / .card). ---- */
   var dragState = null;
 
+  /* ---- Swipe-to-delete sulle righe della Lista spesa ----
+     Scorrendo una riga verso sinistra compare il pulsante "Elimina"; un tocco
+     altrove (o sulla riga aperta) la richiude. Niente cestino sempre in vista. */
+  var SWIPE_REVEAL = 96;        // larghezza del pulsante Elimina rivelato
+  var swipeState = null;
+  var swipeSuppressClick = false; // evita che il click post-swipe apra il modale
+
+  function closeSwipedExcept(keep) {
+    var open = document.querySelectorAll(".swipe-surface.is-swiped");
+    for (var i = 0; i < open.length; i++) if (open[i] !== keep) open[i].classList.remove("is-swiped");
+  }
+
   // Selettore dei figli trascinabili in base al tipo di lista.
   function dragItemSel(list) {
     return list.classList.contains("reorder-list") ? ".card" : ".check-row";
@@ -2750,50 +2784,101 @@
   }
 
   function onPointerDown(e) {
-    var handle = e.target.closest ? e.target.closest(".drag-handle") : null;
-    if (!handle) return;
-    var row = handle.closest(".check-row, .card");
-    var list = row ? row.closest(".check-list, .reorder-list") : null;
-    if (!row || !list) return;
-    e.preventDefault();
-    var sel = dragItemSel(list);
-    dragState = {
-      row: row, list: list, sel: sel,
-      kind: list.getAttribute("data-reorder") || "check",
-      startOrder: rowIdsOf(list, sel).join("|")
+    if (!e.target.closest) return;
+    var handle = e.target.closest(".drag-handle");
+    if (handle) {
+      var row = handle.closest(".check-row, .card");
+      var list = row ? row.closest(".check-list, .reorder-list") : null;
+      if (!row || !list) return;
+      e.preventDefault();
+      var sel = dragItemSel(list);
+      dragState = {
+        row: row, list: list, sel: sel,
+        kind: list.getAttribute("data-reorder") || "check",
+        startOrder: rowIdsOf(list, sel).join("|")
+      };
+      row.classList.add("dragging");
+      document.body.classList.add("is-dragging");
+      try { row.setPointerCapture(e.pointerId); } catch (err) {}
+      return;
+    }
+    // Tocco sul pulsante Elimina rivelato: NON chiudere la riga qui, altrimenti
+    // scorrerebbe via sotto il dito e il click finirebbe sulla riga invece che
+    // sul pulsante (era il motivo per cui "Elimina" non funzionava al tocco).
+    if (e.target.closest(".swipe-del")) return;
+    // Swipe-to-delete: chiudi eventuali righe aperte altrove, poi arma lo swipe.
+    var srow = e.target.closest(".swipe-surface");
+    closeSwipedExcept(srow);
+    if (!srow) return;
+    swipeState = {
+      row: srow,
+      startX: e.clientX, startY: e.clientY,
+      base: srow.classList.contains("is-swiped") ? -SWIPE_REVEAL : 0,
+      lock: null, moved: false
     };
-    row.classList.add("dragging");
-    document.body.classList.add("is-dragging");
-    try { row.setPointerCapture(e.pointerId); } catch (err) {}
   }
 
   function onPointerMove(e) {
-    if (!dragState) return;
-    e.preventDefault();
-    var y = e.clientY;
-    var rows = Array.prototype.slice.call(dragState.list.querySelectorAll(dragState.sel));
-    var ref = null;
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i] === dragState.row) continue;
-      var rect = rows[i].getBoundingClientRect();
-      if (y < rect.top + rect.height / 2) { ref = rows[i]; break; }
+    if (dragState) {
+      e.preventDefault();
+      var y = e.clientY;
+      var rows = Array.prototype.slice.call(dragState.list.querySelectorAll(dragState.sel));
+      var ref = null;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i] === dragState.row) continue;
+        var rect = rows[i].getBoundingClientRect();
+        if (y < rect.top + rect.height / 2) { ref = rows[i]; break; }
+      }
+      if (ref) { if (dragState.row.nextSibling !== ref) dragState.list.insertBefore(dragState.row, ref); }
+      else if (dragState.list.lastElementChild !== dragState.row) { dragState.list.appendChild(dragState.row); }
+      return;
     }
-    if (ref) { if (dragState.row.nextSibling !== ref) dragState.list.insertBefore(dragState.row, ref); }
-    else if (dragState.list.lastElementChild !== dragState.row) { dragState.list.appendChild(dragState.row); }
+    if (!swipeState) return;
+    var dx = e.clientX - swipeState.startX;
+    var dy = e.clientY - swipeState.startY;
+    if (swipeState.lock === null) {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+        swipeState.lock = "h";
+        swipeState.row.classList.add("swiping"); // niente transition durante il trascinamento
+      } else if (Math.abs(dy) > 8) {
+        swipeState = null; // movimento verticale → è uno scroll, lascia perdere
+        return;
+      } else { return; }
+    }
+    if (swipeState.lock !== "h") return;
+    e.preventDefault();
+    swipeState.moved = true;
+    var tx = swipeState.base + dx;
+    if (tx > 0) tx = 0;
+    if (tx < -SWIPE_REVEAL) tx = -SWIPE_REVEAL;
+    swipeState.row.style.transform = "translateX(" + tx + "px)";
   }
 
   function onPointerUp(e) {
-    if (!dragState) return;
-    var st = dragState;
-    dragState = null;
-    st.row.classList.remove("dragging");
-    document.body.classList.remove("is-dragging");
-    try { st.row.releasePointerCapture(e.pointerId); } catch (err) {}
-    var ids = rowIdsOf(st.list, st.sel);
-    if (ids.join("|") === st.startOrder) return; // nessuno spostamento
-    if (st.kind === "task") commitManualOrder(state.data.tasks, ids);
-    else if (st.kind === "idea") commitManualOrder(state.data.ideas, ids);
-    else commitChecklistOrder(ids);
+    if (dragState) {
+      var st = dragState;
+      dragState = null;
+      st.row.classList.remove("dragging");
+      document.body.classList.remove("is-dragging");
+      try { st.row.releasePointerCapture(e.pointerId); } catch (err) {}
+      var ids = rowIdsOf(st.list, st.sel);
+      if (ids.join("|") === st.startOrder) return; // nessuno spostamento
+      if (st.kind === "task") commitManualOrder(state.data.tasks, ids);
+      else if (st.kind === "idea") commitManualOrder(state.data.ideas, ids);
+      else commitChecklistOrder(ids);
+      return;
+    }
+    if (!swipeState) return;
+    var sw = swipeState;
+    swipeState = null;
+    sw.row.classList.remove("swiping");
+    sw.row.style.transform = "";
+    if (sw.lock === "h" && sw.moved) {
+      var open = (sw.base + (e.clientX - sw.startX)) <= -SWIPE_REVEAL / 2;
+      sw.row.classList.toggle("is-swiped", open);
+      swipeSuppressClick = true; // il click che segue lo swipe non deve aprire il modale
+      setTimeout(function () { swipeSuppressClick = false; }, 80);
+    }
   }
 
   function commitChecklistOrder(ids) {
