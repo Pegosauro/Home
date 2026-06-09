@@ -333,6 +333,10 @@
 .status-chip.is-active.badge-stato-in_corso  { color: var(--stato-in_corso);  background: color-mix(in srgb, var(--stato-in_corso) 18%, transparent); }
 .status-chip.is-active.badge-stato-in_attesa { color: var(--stato-in_attesa); background: color-mix(in srgb, var(--stato-in_attesa) 18%, transparent); }
 .status-chip.is-active.badge-stato-fatto     { color: var(--stato-fatto);     background: color-mix(in srgb, var(--stato-fatto) 18%, transparent); }
+.status-chip.is-active.badge-idea-bozza       { color: var(--idea-bozza);       background: color-mix(in srgb, var(--idea-bozza) 18%, transparent); }
+.status-chip.is-active.badge-idea-da_valutare { color: var(--idea-da_valutare); background: color-mix(in srgb, var(--idea-da_valutare) 18%, transparent); }
+.status-chip.is-active.badge-idea-approvata   { color: var(--idea-approvata);   background: color-mix(in srgb, var(--idea-approvata) 18%, transparent); }
+.status-chip.is-active.badge-idea-archiviata  { color: var(--idea-archiviata);  background: color-mix(in srgb, var(--idea-archiviata) 18%, transparent); }
 
 /* Pulsante "Modifica" nella card dettaglio + "Elimina" tenue in fondo pagina */
 /* Icone azioni in testata dettaglio (usate ancora dal dettaglio Idea) */

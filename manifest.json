@@ -1,7 +1,7 @@
 {
   "name": "Home App",
   "short_name": "Home App",
-  "description": "Gestione lavori di casa, stanze, piani/aree e idee progettuali.",
+  "description": "Gestione lavori di casa, stanze, piani/aree e progetti.",
   "lang": "it",
   "dir": "ltr",
   "start_url": "./index.html",

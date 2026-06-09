@@ -11,7 +11,7 @@
      ========================================================== */
   var CONFIG = {
     STORAGE_KEY: "casa-app-v2-data",
-    VERSION: "2.8.0",
+    VERSION: "2.9.0",
     DEFAULT_ACCENT: "#218bff",
     ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
     ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"],
@@ -53,7 +53,7 @@
   var PRIO_LABEL = { alta: "Alta", media: "Media", bassa: "Bassa" };
   var PRIO_RANK = { alta: 0, media: 1, bassa: 2 };
   var STATUS_LABEL = { da_fare: "Da fare", in_corso: "In corso", in_attesa: "In attesa", fatto: "Fatto" };
-  var IDEA_LABEL = { bozza: "Bozza", da_valutare: "Da valutare", approvata: "Approvata", archiviata: "Archiviata" };
+  var IDEA_LABEL = { bozza: "Bozza", da_valutare: "Da valutare", approvata: "Approvato", archiviata: "Archiviato" };
   var IDEA_RANK = { approvata: 0, da_valutare: 1, bozza: 2, archiviata: 3 };
 
   // Modalità di ordinamento (chiave + etichetta). "manuale" sblocca il drag&drop.
@@ -758,7 +758,7 @@
       // Sotto-sezione di Opzioni: header con freccia indietro al menu Opzioni.
       inner = slimHeaderHtml("opzioni-root", OPT_SECTIONS[route.param] || "Opzioni");
     } else {
-      var titles = { home: "La mia casa", lavori: "Lavori", idee: "Idee", spesa: "Lista spesa", opzioni: "Opzioni" };
+      var titles = { home: "La mia casa", lavori: "Lavori", idee: "Progetti", spesa: "Lista spesa", opzioni: "Opzioni" };
       inner = '<div class="grow"><div class="header-title">' + titles[route.name] + "</div></div>";
     }
     return inner + gdIndicatorHtml();
@@ -767,7 +767,7 @@
   var NAV_ITEMS = [
     { r: "home", l: "Home", i: "home" },
     { r: "lavori", l: "Lavori", i: "tasks" },
-    { r: "idee", l: "Idee", i: "bulb" },
+    { r: "idee", l: "Progetti", i: "bulb" },
     { r: "spesa", l: "Spesa", i: "cart" },
     { r: "opzioni", l: "Opzioni", i: "settings" }
   ];
@@ -922,7 +922,7 @@
     if (overdue > 0) pills += '<span class="count-pill is-danger">' + svg("alert", "ico-sm") + overdue + (overdue === 1 ? " scaduto" : " scaduti") + "</span>";
     else if (alta > 0) pills += '<span class="count-pill is-danger">' + svg("alert", "ico-sm") + alta + (alta === 1 ? " urgente" : " urgenti") + "</span>";
     if (open > 0) pills += '<span class="count-pill">' + svg("tasks", "ico-sm") + open + " aperti</span>";
-    if (ideasN > 0) pills += '<span class="count-pill">' + svg("bulb", "ico-sm") + ideasN + " idee</span>";
+    if (ideasN > 0) pills += '<span class="count-pill">' + svg("bulb", "ico-sm") + ideasN + (ideasN === 1 ? " progetto" : " progetti") + "</span>";
     if (!pills) pills = '<span class="count-pill room-empty-hint">Tutto a posto</span>';
 
     return '<button class="card card-tap room-card" data-action="open-room" data-id="' + r.id + '">' +
@@ -1055,12 +1055,12 @@
       body = '<div class="stack reorder-list" data-reorder="idea">' +
         active.map(function (i) { return ideaCard(i, manual && active.length > 1); }).join("") + "</div>";
     } else if (arch.length) {
-      body = '<div class="all-done-note">' + svg("check", "ico-sm") + "Tutte le idee sono archiviate.</div>";
+      body = '<div class="all-done-note">' + svg("check", "ico-sm") + "Tutti i progetti sono archiviati.</div>";
     } else {
-      body = emptyState("bulb", "Nessuna idea", "Annota la tua prima idea progettuale con il pulsante +.");
+      body = emptyState("bulb", "Nessun progetto", "Annota il tuo primo progetto con il pulsante +.");
     }
-    var archHtml = collapsibleDone("arch", state.archOpen, "Archiviate", arch, function (i) { return ideaCard(i, false); });
-    return listToolbar("", "idea") + body + archHtml + fab("add-idea", "Aggiungi idea");
+    var archHtml = collapsibleDone("arch", state.archOpen, "Archiviati", arch, function (i) { return ideaCard(i, false); });
+    return listToolbar("", "idea") + body + archHtml + fab("add-idea", "Aggiungi progetto");
   }
 
   function ideaCard(i, draggable) {
@@ -1083,7 +1083,7 @@
         '<div class="idea-foot">' + ideaBadge(i.status) + costBadge + clistPill + shopPill + "</div>" +
         '<div class="idea-loc">' + locCompactHtml(i.roomIds) + "</div>" +
       "</div>" +
-      swipeDelBtn("del-idea", i.id, "Elimina idea") +
+      swipeDelBtn("del-idea", i.id, "Elimina progetto") +
       "</div>";
   }
 
@@ -1109,21 +1109,21 @@
       : emptyState("tasks", "Nessun lavoro", "Aggiungi un lavoro per questa stanza.");
     var ideasBlock = ilist.length
       ? '<div class="stack">' + ilist.map(ideaCard).join("") + "</div>"
-      : emptyState("bulb", "Nessuna idea", "Aggiungi un'idea per questa stanza.");
+      : emptyState("bulb", "Nessun progetto", "Aggiungi un progetto per questa stanza.");
 
     return '' +
       '<div class="room-stat-row">' +
         '<div class="room-stat"><span class="rs-ico">' + svg("tasks") + '</span><span><span class="rs-val mono">' + openN + '</span><span class="rs-lbl">Lavori aperti</span></span></div>' +
-        '<div class="room-stat"><span class="rs-ico">' + svg("bulb") + '</span><span><span class="rs-val mono">' + ideasN + '</span><span class="rs-lbl">Idee</span></span></div>' +
+        '<div class="room-stat"><span class="rs-ico">' + svg("bulb") + '</span><span><span class="rs-val mono">' + ideasN + '</span><span class="rs-lbl">Progetti</span></span></div>' +
       "</div>" +
 
       '<div class="room-add-row">' +
         '<button class="btn btn-primary" data-action="add-task-room" data-room="' + r.id + '">' + svg("plus") + "Lavoro</button>" +
-        '<button class="btn" data-action="add-idea-room" data-room="' + r.id + '">' + svg("plus") + "Idea</button>" +
+        '<button class="btn" data-action="add-idea-room" data-room="' + r.id + '">' + svg("plus") + "Progetto</button>" +
       "</div>" +
 
       '<section class="section"><div class="section-head"><h2>Lavori</h2></div>' + tasksBlock + "</section>" +
-      '<section class="section"><div class="section-head"><h2>Idee</h2></div>' + ideasBlock + "</section>";
+      '<section class="section"><div class="section-head"><h2>Progetti</h2></div>' + ideasBlock + "</section>";
   }
 
   // ---------- DETTAGLIO LAVORO + CHECKLIST ----------
@@ -1203,35 +1203,45 @@
     state.currentIdeaId = ideaId;
     var i = findIdea(ideaId);
     if (!i) {
-      return emptyState("alert", "Idea non trovata", "Questa idea non esiste più.") +
-        '<button class="btn btn-block" data-action="back-idea">Torna alle idee</button>';
+      return emptyState("alert", "Progetto non trovato", "Questo progetto non esiste più.") +
+        '<button class="btn btn-block" data-action="back-idea">Torna ai progetti</button>';
     }
     var detail =
       '<div class="card detail-card">' +
-        '<div class="detail-top">' +
-          '<h1 class="detail-title">' + h(i.title) + "</h1>" +
-          '<div class="task-actions">' +
-            iconBtn("edit-idea", i.id, "pencil", "Modifica idea") +
-            iconBtn("del-idea", i.id, "trash", "Elimina idea", true) +
-          "</div>" +
-        "</div>" +
+        '<h1 class="detail-title">' + h(i.title) + "</h1>" +
         locChipsHtml(i.roomIds) +
-        '<div class="task-badges">' + ideaBadge(i.status) +
-          (i.cost ? '<span class="badge badge-soft idea-cost">' + svg("coin", "ico-sm") + h(i.cost) + "</span>" : "") +
+        (i.cost ? '<div class="task-badges"><span class="badge badge-soft idea-cost">' + svg("coin", "ico-sm") + h(i.cost) + "</span></div>" : "") +
+        '<div class="detail-status">' +
+          '<span class="detail-status-label">Stato</span>' +
+          ideaStatusSwitcher(i) +
         "</div>" +
         (i.link && isSafeUrl(i.link)
           ? '<a class="idea-link" href="' + h(i.link) + '" target="_blank" rel="noopener noreferrer">' + svg("extlink", "ico-sm") + '<span>' + h(i.link) + "</span></a>"
           : "") +
         (i.description ? '<p class="detail-desc">' + h(i.description) + "</p>" : "") +
+        '<button class="btn btn-block detail-edit" data-action="edit-idea" data-id="' + i.id + '">' + svg("pencil") + "Modifica progetto</button>" +
       "</div>";
 
     return detail +
       '<section class="section">' +
-        checklistBlock(i.checklist || [], "Punti da valutare", "Aggiungi le cose da decidere o verificare per questa idea.") +
+        checklistBlock(i.checklist || [], "Punti da valutare", "Aggiungi le cose da decidere o verificare per questo progetto.") +
       "</section>" +
       '<section class="section">' +
         shoppingLinkedBlock("idea", i.id) +
-      "</section>";
+      "</section>" +
+      '<button class="detail-delete" data-action="del-idea" data-id="' + i.id + '">' + svg("trash", "ico-sm") + "Elimina progetto</button>";
+  }
+
+  // Selettore di stato del progetto (griglia 2×2), come quello del lavoro.
+  function ideaStatusSwitcher(i) {
+    var opts = ["bozza", "da_valutare", "approvata", "archiviata"];
+    return '<div class="status-switch" role="group" aria-label="Stato del progetto">' +
+      opts.map(function (s) {
+        var on = i.status === s;
+        return '<button class="status-chip' + (on ? " is-active badge-idea-" + s : "") + '" ' +
+          'data-action="set-idea-status" data-id="' + i.id + '" data-status="' + s + '" aria-pressed="' + on + '">' +
+          '<span class="dot"></span>' + IDEA_LABEL[s] + "</button>";
+      }).join("") + "</div>";
   }
 
   // Riquadro "Spesa collegata" riutilizzabile (lavoro/idea)
@@ -1413,7 +1423,7 @@
     return '<option value="">Senza collegamento</option>' +
       group("Stanze", rooms(), "room", function (r) { return r.name; }) +
       group("Lavori", state.data.tasks, "task", function (t) { return t.title; }) +
-      group("Idee", state.data.ideas, "idea", function (i) { return i.title; });
+      group("Progetti", state.data.ideas, "idea", function (i) { return i.title; });
   }
 
   // ---------- OPZIONI ----------
@@ -1482,7 +1492,7 @@
         diagRow("Piani / aree", String(d.house.floors.length)) +
         diagRow("Stanze", String(d.house.rooms.length)) +
         diagRow("Lavori", String(d.tasks.length)) +
-        diagRow("Idee", String(d.ideas.length)) +
+        diagRow("Progetti", String(d.ideas.length)) +
         diagRow("Voci spesa", String(d.shopping.length)) +
         diagRow("Chiave storage", CONFIG.STORAGE_KEY) +
         diagRow("Ultimo agg.", formatDateTime(d.updatedAt)) +
@@ -1609,7 +1619,7 @@
     var isEdit = !!idea;
     var sel = idea ? (idea.roomIds || []) : (presetRoomId ? [presetRoomId] : []);
     var inner =
-      modalHead(isEdit ? "Modifica idea" : "Nuova idea") +
+      modalHead(isEdit ? "Modifica progetto" : "Nuovo progetto") +
       '<form class="modal-body" data-action="save-idea" data-id="' + (idea ? idea.id : "") + '">' +
         field("Titolo", '<input class="input" type="text" name="title" maxlength="80" autocomplete="off" placeholder="Es. Parete attrezzata" value="' + h(idea ? idea.title : "") + '" />') +
         '<div class="field"><label>Stanze</label>' + roomChipsSelector(sel) +
@@ -1619,7 +1629,7 @@
           field("Stima costo", '<input class="input" type="text" name="cost" inputmode="decimal" maxlength="20" autocomplete="off" placeholder="Es. 1200 €" value="' + h(idea ? idea.cost : "") + '" />') +
         "</div>" +
         field("Link di riferimento", '<input class="input" type="url" name="link" maxlength="300" autocomplete="off" inputmode="url" placeholder="https://… (facoltativo)" value="' + h(idea ? idea.link : "") + '" />') +
-        field("Descrizione", '<textarea class="textarea" name="description" maxlength="600" placeholder="Descrivi l\'idea (facoltativo)">' + h(idea ? idea.description : "") + "</textarea>") +
+        field("Descrizione", '<textarea class="textarea" name="description" maxlength="600" placeholder="Descrivi il progetto (facoltativo)">' + h(idea ? idea.description : "") + "</textarea>") +
         '<div class="modal-actions">' +
           '<button class="btn btn-ghost" type="button" data-action="modal-close">Annulla</button>' +
           '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
@@ -1770,7 +1780,7 @@
         "</button>";
     }).join("");
     openModal(
-      modalHead(kind === "task" ? "Ordina i lavori" : "Ordina le idee") +
+      modalHead(kind === "task" ? "Ordina i lavori" : "Ordina i progetti") +
       '<div class="modal-body sort-list">' + rows + "</div>"
     );
   }
@@ -1849,6 +1859,12 @@
         }
         break;
       }
+      case "set-idea-status": {
+        var isd = findIdea(id);
+        var nis = node.getAttribute("data-status");
+        if (isd && isd.status !== nis) { isd.status = nis; isd.updatedAt = nowISO(); persist(); render(); }
+        break;
+      }
       case "del-task": {
         var t = findTask(id);
         openConfirm({
@@ -1925,8 +1941,8 @@
       case "del-idea": {
         var ii = findIdea(id);
         openConfirm({
-          title: "Elimina idea",
-          message: "Vuoi eliminare l'idea <strong>" + h(ii.title) + "</strong>?",
+          title: "Elimina progetto",
+          message: "Vuoi eliminare il progetto <strong>" + h(ii.title) + "</strong>?",
           onConfirm: function () {
             unlinkShopping("idea", id);
             state.data.ideas = state.data.ideas.filter(function (x) { return x.id !== id; });
@@ -1980,7 +1996,7 @@
       case "reset-data":
         openConfirm({
           title: "Reset dati",
-          message: "Verranno eliminati <strong>tutti</strong> i dati: piani, stanze, lavori e idee.",
+          message: "Verranno eliminati <strong>tutti</strong> i dati: piani, stanze, lavori e progetti.",
           warn: "L'app tornerà alla schermata di configurazione. Operazione non annullabile.",
           confirmLabel: "Elimina tutto",
           onConfirm: function () {
@@ -2004,7 +2020,7 @@
         openConfirm({
           title: "Elimina piano/area",
           message: "Vuoi eliminare <strong>" + h(f.name) + "</strong>?",
-          warn: nR > 0 ? ("Verranno eliminate anche " + nR + " stanze e tutti i lavori/idee collegati.") : "",
+          warn: nR > 0 ? ("Verranno eliminate anche " + nR + " stanze e tutti i lavori/progetti collegati.") : "",
           onConfirm: function () { deleteFloor(id); toast("Dati eliminati", "success"); state.manageFloorId = null; render(); openManageFloors(); },
           onCancel: function () { openManageRoomsOfFloor(state.manageFloorId); }
         });
@@ -2086,7 +2102,7 @@
     } else {
       state.data.ideas.push(createIdea({ title: title, roomIds: roomIds, status: status, description: description, cost: cost, link: link }));
     }
-    persist(); closeModal(); toast("Idea salvata", "success"); render();
+    persist(); closeModal(); toast("Progetto salvato", "success"); render();
   }
 
   function saveFloor(form) {

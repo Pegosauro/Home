@@ -104,14 +104,11 @@ a, button, [data-action] {
   border-radius: 6px;
 }
 
-/* Scrollbar discreta su desktop */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 999px;
-  border: 3px solid transparent;
-  background-clip: padding-box;
-}
+/* Barre di scorrimento nascoste (lo scroll resta pienamente attivo): look "app".
+   Vale per la pagina e per i contenitori interni (barre filtro, modali...). */
+* { scrollbar-width: none; }                 /* Firefox */
+html { -ms-overflow-style: none; }            /* vecchio Edge/IE */
+::-webkit-scrollbar { width: 0; height: 0; display: none; } /* WebKit/Chromium */
 
 .visually-hidden {
   position: absolute !important;

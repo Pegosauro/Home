@@ -1,10 +1,10 @@
 ========================================
  HOME APP — Istruzioni
- Versione 2.8.0
+ Versione 2.9.0
 ========================================
 
 Home App è una web app statica (PWA leggera) per gestire lavori di casa,
-stanze, piani/aree e idee progettuali. Funziona sia aprendo index.html in
+stanze, piani/aree e progetti. Funziona sia aprendo index.html in
 locale sia pubblicata su GitHub Pages. I dati restano salvati SOLO sul tuo
 dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
 
@@ -12,7 +12,7 @@ dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
  FUNZIONALITÀ PRINCIPALI
 ----------------------------------------
 
-- HOME: riepilogo (lavori, aperti, alta priorità, completati, idee) e le
+- HOME: riepilogo (lavori, aperti, alta priorità, completati, progetti) e le
   stanze raggruppate per piano/area.
 - LAVORI: elenco con priorità (alta/media/bassa) e stato
   (da fare / in corso / in attesa / fatto), filtro per priorità.
@@ -28,16 +28,16 @@ dispositivo (localStorage del browser), nella chiave "casa-app-v2-data".
   STATO RAPIDO: ogni nuovo lavoro parte come "Da fare". Lo stato
   (Da fare / In corso / In attesa / Fatto) si cambia con un tocco
   direttamente dalla pagina del lavoro, senza aprire la modifica.
-- IDEE: elenco con stato (bozza / da valutare / approvata / archiviata),
+- PROGETTI: elenco con stato (bozza / da valutare / approvato / archiviato),
   link di riferimento e stima costo. Stesso pulsante "Ordina" (Manuale /
-  Stato / Costo / Recenti) con trascinamento in modalità Manuale; le idee
-  "archiviata" finiscono in una sezione "Archiviate (N)" comprimibile.
-- Dettaglio LAVORO/IDEA: titolo completo, CHECKLIST riordinabile
+  Stato / Costo / Recenti) con trascinamento in modalità Manuale; i progetti
+  "archiviato" finiscono in una sezione "Archiviati (N)" comprimibile.
+- Dettaglio LAVORO/PROGETTO: titolo completo, CHECKLIST riordinabile
   (trascina la maniglia), e SPESA collegata.
-- Un lavoro/idea può stare su PIÙ STANZE (oppure su nessuna: "Senza stanza").
+- Un lavoro/progetto può stare su PIÙ STANZE (oppure su nessuna: "Senza stanza").
 - SPESA: lista della spesa unica, con quantità, categoria "Dove comprare"
   (ferramenta, arredamento, ...), nota per articolo e collegamento opzionale
-  a una stanza, a un lavoro o a un'idea. Filtro per categoria. Tocca un
+  a una stanza, a un lavoro o a un progetto. Filtro per categoria. Tocca un
   articolo per modificarlo.
 - OPZIONI: organizzate a menu (tocca una voce per entrare nella sezione):
     · Aspetto (tema chiaro/scuro, colore accento)
@@ -117,7 +117,7 @@ Quando esce una nuova versione, in basso compare l'avviso
 l'app si ricarica già aggiornata. I tuoi dati NON vengono toccati.
 
 PER CHI PUBBLICA: a ogni rilascio cambia la riga
-   var CACHE_VERSION = "casa-app-2.8.0";
+   var CACHE_VERSION = "casa-app-2.9.0";
 in cima al file sw.js (es. "casa-app-2.7.1"). È questo cambio che fa
 scattare l'avviso di aggiornamento sui dispositivi. Ricordati di
 caricare ANCHE sw.js insieme agli altri file su GitHub Pages.
@@ -282,7 +282,7 @@ Dopo un Reset dati l'app torna alla schermata "CONFIGURA CASA".
 ----------------------------------------
 
 In OPZIONI trovi un box "Diagnostica" che mostra lo stato dei dati:
-versione app, numero piani/aree, stanze, lavori, idee, voci spesa,
+versione app, numero piani/aree, stanze, lavori, progetti, voci spesa,
 chiave di salvataggio e data dell'ultimo aggiornamento. Utile per
 controllare al volo cosa c'è salvato sul dispositivo.
 
