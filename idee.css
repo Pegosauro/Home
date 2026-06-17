@@ -67,3 +67,148 @@
 .idea-link .ico { flex: none; }
 .idea-link > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .idea-link:active { filter: brightness(0.95); }
+
+/* Procedura progetto - editor a blocchi */
+.procedure-section {
+  margin-top: 16px;
+}
+
+.procedure-head {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.procedure-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.procedure-add-btn {
+  min-height: 34px;
+  padding-inline: 10px;
+}
+
+.procedure-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.procedure-block {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.procedure-block-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--muted);
+}
+
+.procedure-grip {
+  display: inline-flex;
+  color: var(--text-soft);
+}
+
+.procedure-type-select {
+  width: auto;
+  min-width: 116px;
+  height: 34px;
+  padding-block: 4px;
+}
+
+.procedure-type-label {
+  display: none;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.procedure-block-toolbar .icon-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+}
+
+.procedure-block-toolbar .icon-btn:disabled {
+  opacity: 0.35;
+}
+
+.procedure-block-body {
+  padding: 12px;
+}
+
+.procedure-block-input {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.5;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px;
+}
+
+.procedure-input-heading {
+  min-height: 48px;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.procedure-input-note {
+  background: var(--accent-weak);
+  border: 1px solid var(--accent-line);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.procedure-input-bullet {
+  min-height: 120px;
+}
+
+.procedure-check-list {
+  display: grid;
+  gap: 8px;
+}
+
+.procedure-check-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.procedure-check-input.is-done {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.procedure-check-add,
+.procedure-add {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.procedure-add {
+  margin-top: 12px;
+}
+
+@media (max-width: 520px) {
+  .procedure-head-actions {
+    justify-content: flex-start;
+  }
+  .procedure-block-toolbar {
+    flex-wrap: wrap;
+  }
+  .procedure-type-label {
+    display: inline;
+  }
+}
+

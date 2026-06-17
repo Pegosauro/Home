@@ -11,7 +11,7 @@
      ========================================================== */
   var CONFIG = {
     STORAGE_KEY: "casa-app-v2-data",
-    VERSION: "2.9.2",
+    VERSION: "2.9.4",
     DEFAULT_ACCENT: "#218bff",
     ACCENTS: ["#218bff", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899", "#f97316", "#22c55e", "#14b8a6"],
     ROOM_COLORS: ["#218bff", "#38c172", "#f5a623", "#ff5a5f", "#a855f7", "#06b6d4", "#ec4899", "#f97316", "#64748b", "#ef4444"],
@@ -55,6 +55,7 @@
   var STATUS_LABEL = { da_fare: "Da fare", in_corso: "In corso", in_attesa: "In attesa", fatto: "Fatto" };
   var IDEA_LABEL = { bozza: "Bozza", wip: "WIP", realizzato: "Realizzato" };
   var IDEA_RANK = { wip: 0, bozza: 1, realizzato: 2 };
+  var PROCEDURE_LABEL = { text: "Testo", heading: "Titolo", checklist: "Checklist", note: "Nota", bullet: "Elenco" };
   // Migrazione dal vecchio schema a 4 stati: i progetti salvati prima passano
   // al nuovo modello (Bozza / WIP / Realizzato) al caricamento.
   var IDEA_STATUS_MIGRATE = {
@@ -207,6 +208,44 @@
     };
   }
 
+  function isProcedureType(type) {
+    return type === "text" || type === "heading" || type === "checklist" || type === "note" || type === "bullet";
+  }
+
+  function createProcedureBlock(type, text) {
+    type = isProcedureType(type) ? type : "text";
+    var block = { id: uid("pblk"), type: type };
+    if (type === "checklist") {
+      var rows = String(text || "").split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+      block.items = rows.length ? rows.map(function (x) { return createProcedureCheckItem(x); }) : [];
+    } else {
+      block.text = text || "";
+    }
+    return block;
+  }
+
+  function createProcedureCheckItem(text) {
+    return { id: uid("pchk"), text: text || "", done: false };
+  }
+
+  function normalizeProcedureBlocks(blocks) {
+    return (Array.isArray(blocks) ? blocks : []).map(function (b) {
+      b = b && typeof b === "object" ? b : {};
+      var type = isProcedureType(b.type) ? b.type : "text";
+      var out = { id: b.id || uid("pblk"), type: type };
+      if (type === "checklist") {
+        var src = Array.isArray(b.items) ? b.items : [];
+        out.items = src.map(function (it) {
+          it = it && typeof it === "object" ? it : { text: String(it || "") };
+          return { id: it.id || uid("pchk"), text: typeof it.text === "string" ? it.text : "", done: !!it.done };
+        });
+      } else {
+        out.text = typeof b.text === "string" ? b.text : "";
+      }
+      return out;
+    });
+  }
+
   // Garantisce che un oggetto importato/caricato abbia tutti i campi
   function normalizeData(obj) {
     var d = createDefaultData();
@@ -248,6 +287,10 @@
       i.checklist = Array.isArray(i.checklist) ? i.checklist : [];
       i.link = typeof i.link === "string" ? i.link : "";
       i.cost = typeof i.cost === "string" ? i.cost : (i.cost != null ? String(i.cost) : "");
+      i.procedure = typeof i.procedure === "string" ? i.procedure : "";
+      i.procedureBlocks = Array.isArray(i.procedureBlocks)
+        ? normalizeProcedureBlocks(i.procedureBlocks)
+        : (i.procedure ? [createProcedureBlock("text", i.procedure)] : []);
       i.status = IDEA_STATUS_MIGRATE[i.status] || "bozza";
       i.order = typeof i.order === "number" ? i.order : idx;
       return i;
@@ -316,6 +359,8 @@
     var iso = nowISO();
     return {
       id: uid("idea"), roomIds: Array.isArray(d.roomIds) ? d.roomIds : [], title: d.title, description: d.description || "",
+      procedure: d.procedure || "",
+      procedureBlocks: Array.isArray(d.procedureBlocks) ? normalizeProcedureBlocks(d.procedureBlocks) : [],
       status: d.status || "bozza", link: d.link || "", cost: d.cost || "",
       checklist: [], order: nextOrder(state.data && state.data.ideas),
       createdAt: iso, updatedAt: iso
@@ -1279,6 +1324,125 @@
   }
 
   // ---------- DETTAGLIO IDEA ----------
+  function ensureProcedureBlocks(idea) {
+    if (!idea) return [];
+    if (!Array.isArray(idea.procedureBlocks)) {
+      idea.procedureBlocks = idea.procedure ? [createProcedureBlock("text", idea.procedure)] : [];
+    }
+    idea.procedureBlocks = normalizeProcedureBlocks(idea.procedureBlocks);
+    return idea.procedureBlocks;
+  }
+
+  function procedurePlainText(blocks) {
+    return (blocks || []).map(function (b) {
+      if (b.type === "checklist") {
+        return (b.items || []).map(function (it) { return (it.done ? "☑ " : "☐ ") + it.text; }).join("\n");
+      }
+      return b.text || "";
+    }).filter(function (x) { return x.trim(); }).join("\n\n");
+  }
+
+  function touchProcedure(idea) {
+    if (!idea) return;
+    idea.procedure = procedurePlainText(idea.procedureBlocks || []);
+    idea.updatedAt = nowISO();
+    persist();
+  }
+
+  function findProcedureBlock(ideaId, blockId) {
+    var idea = findIdea(ideaId);
+    if (!idea) return null;
+    var blocks = ensureProcedureBlocks(idea);
+    for (var i = 0; i < blocks.length; i++) if (blocks[i].id === blockId) return { idea: idea, blocks: blocks, block: blocks[i], index: i };
+    return null;
+  }
+
+  function procedureTypeOptions(current) {
+    var keys = ["text", "heading", "checklist", "note", "bullet"];
+    return keys.map(function (k) {
+      return '<option value="' + k + '"' + (current === k ? " selected" : "") + '>' + PROCEDURE_LABEL[k] + '</option>';
+    }).join("");
+  }
+
+  function procedureEditorHtml(idea) {
+    var blocks = ensureProcedureBlocks(idea);
+    var body = blocks.length
+      ? blocks.map(function (b, idx) { return procedureBlockHtml(idea.id, b, idx, blocks.length); }).join("")
+      : '<p class="check-empty">Nessuna procedura inserita. Usa il campo sotto o il pulsante + per aggiungere un blocco.</p>';
+    return '<section class="section procedure-section">' +
+      '<div class="section-head procedure-head"><h2>Procedura</h2>' +
+        '<div class="procedure-head-actions">' +
+          procedureAddBtn(idea.id, "text", "Testo") +
+          procedureAddBtn(idea.id, "heading", "Titolo") +
+          procedureAddBtn(idea.id, "checklist", "Checklist") +
+          procedureAddBtn(idea.id, "note", "Nota") +
+        '</div>' +
+      '</div>' +
+      '<div class="procedure-editor" data-idea="' + idea.id + '">' + body + '</div>' +
+      '<form class="procedure-add" data-action="add-procedure-from-command" data-id="' + idea.id + '">' +
+        '<input class="input" type="text" name="text" autocomplete="off" placeholder="Scrivi testo oppure /titolo, /checklist, /nota, /elenco..." />' +
+        '<button class="setup-inline-add" type="submit" aria-label="Aggiungi blocco">' + svg("plus") + '</button>' +
+      '</form>' +
+    '</section>';
+  }
+
+  function procedureAddBtn(ideaId, type, label) {
+    return '<button class="btn btn-sm btn-ghost procedure-add-btn" type="button" data-action="add-procedure-block" data-id="' + ideaId + '" data-type="' + type + '">' + svg("plus", "ico-sm") + label + '</button>';
+  }
+
+  function procedureBlockHtml(ideaId, b, idx, total) {
+    var label = PROCEDURE_LABEL[b.type] || "Testo";
+    return '<div class="procedure-block procedure-block--' + b.type + '" data-block="' + b.id + '">' +
+      '<div class="procedure-block-toolbar">' +
+        '<span class="procedure-grip">' + svg("grip", "ico-sm") + '</span>' +
+        '<select class="select procedure-type-select" data-proc-change="type" data-id="' + ideaId + '" data-block="' + b.id + '" aria-label="Tipo blocco">' + procedureTypeOptions(b.type) + '</select>' +
+        '<span class="procedure-type-label">' + h(label) + '</span>' +
+        '<button class="icon-btn" type="button" data-action="move-procedure-block" data-id="' + ideaId + '" data-block="' + b.id + '" data-dir="up" ' + (idx === 0 ? 'disabled' : '') + ' aria-label="Sposta su">↑</button>' +
+        '<button class="icon-btn" type="button" data-action="move-procedure-block" data-id="' + ideaId + '" data-block="' + b.id + '" data-dir="down" ' + (idx === total - 1 ? 'disabled' : '') + ' aria-label="Sposta giù">↓</button>' +
+        '<button class="icon-btn is-danger" type="button" data-action="del-procedure-block" data-id="' + ideaId + '" data-block="' + b.id + '" aria-label="Elimina blocco">' + svg("trash", "ico-sm") + '</button>' +
+      '</div>' +
+      '<div class="procedure-block-body">' + procedureBlockBodyHtml(ideaId, b) + '</div>' +
+    '</div>';
+  }
+
+  function procedureBlockBodyHtml(ideaId, b) {
+    if (b.type === "checklist") return procedureChecklistHtml(ideaId, b);
+    var cls = b.type === "heading" ? "procedure-input-heading" : b.type === "note" ? "procedure-input-note" : b.type === "bullet" ? "procedure-input-bullet" : "";
+    var ph = b.type === "heading" ? "Titolo sezione..." : b.type === "note" ? "Nota operativa..." : b.type === "bullet" ? "Una voce per riga..." : "Scrivi il testo della procedura...";
+    return '<textarea class="textarea procedure-block-input ' + cls + '" data-proc-input="text" data-id="' + ideaId + '" data-block="' + b.id + '" rows="' + (b.type === "heading" ? 1 : 3) + '" placeholder="' + ph + '">' + h(b.text || "") + '</textarea>';
+  }
+
+  function procedureChecklistHtml(ideaId, b) {
+    var items = Array.isArray(b.items) ? b.items : [];
+    var rows = items.length ? items.map(function (it) {
+      return '<div class="procedure-check-row">' +
+        '<button class="check-box' + (it.done ? " is-done" : "") + '" type="button" data-action="toggle-procedure-check" data-id="' + ideaId + '" data-block="' + b.id + '" data-check="' + it.id + '" aria-label="Completa voce">' + svg("check", "ico-sm") + '</button>' +
+        '<input class="input procedure-check-input' + (it.done ? " is-done" : "") + '" type="text" data-proc-check-input="text" data-id="' + ideaId + '" data-block="' + b.id + '" data-check="' + it.id + '" value="' + h(it.text || "") + '" placeholder="Voce checklist..." />' +
+        '<button class="icon-btn is-danger" type="button" data-action="del-procedure-check" data-id="' + ideaId + '" data-block="' + b.id + '" data-check="' + it.id + '" aria-label="Elimina voce">' + svg("trash", "ico-sm") + '</button>' +
+      '</div>';
+    }).join("") : '<p class="check-empty">Checklist vuota.</p>';
+    return '<div class="procedure-check-list">' + rows + '</div>' +
+      '<form class="procedure-check-add" data-action="add-procedure-check" data-id="' + ideaId + '" data-block="' + b.id + '">' +
+        '<input class="input" type="text" name="text" autocomplete="off" placeholder="Aggiungi voce checklist..." />' +
+        '<button class="setup-inline-add" type="submit" aria-label="Aggiungi voce">' + svg("plus") + '</button>' +
+      '</form>';
+  }
+
+  function parseProcedureCommand(raw) {
+    raw = String(raw || "").trim();
+    if (!raw) return null;
+    if (raw.charAt(0) !== "/") return { type: "text", text: raw };
+    var parts = raw.slice(1).split(/\s+/);
+    var cmd = (parts.shift() || "").toLowerCase();
+    var text = raw.slice(cmd.length + 2).trim();
+    if (cmd === "titolo" || cmd === "h" || cmd === "heading") return { type: "heading", text: text };
+    if (cmd === "check" || cmd === "checklist" || cmd === "todo") return { type: "checklist", text: text };
+    if (cmd === "nota" || cmd === "note") return { type: "note", text: text };
+    if (cmd === "elenco" || cmd === "lista" || cmd === "bullet") return { type: "bullet", text: text };
+    if (cmd === "testo" || cmd === "text") return { type: "text", text: text };
+    return { type: "text", text: raw };
+  }
+
   function viewIdeaDetail(ideaId) {
     state.currentIdeaId = ideaId;
     var i = findIdea(ideaId);
@@ -1303,6 +1467,7 @@
       "</div>";
 
     return detail +
+      procedureEditorHtml(i) +
       '<section class="section">' +
         checklistBlock(i.checklist || [], "Punti da valutare", "Aggiungi le cose da decidere o verificare per questo progetto.") +
       "</section>" +
@@ -1704,6 +1869,7 @@
         "</div>" +
         field("Link di riferimento", '<input class="input" type="url" name="link" maxlength="300" autocomplete="off" inputmode="url" placeholder="https://… (facoltativo)" value="' + h(idea ? idea.link : "") + '" />') +
         field("Descrizione", '<textarea class="textarea" name="description" maxlength="600" placeholder="Descrivi il progetto (facoltativo)">' + h(idea ? idea.description : "") + "</textarea>") +
+        '<div class="field-hint" style="margin-top:-8px">La procedura si modifica dalla pagina dettaglio del progetto con l\'editor a blocchi.</div>' +
         '<div class="modal-actions">' +
           '<button class="btn btn-ghost" type="button" data-action="modal-close">Annulla</button>' +
           '<button class="btn btn-primary" type="submit">' + svg("check") + "Salva</button>" +
@@ -2014,6 +2180,67 @@
         break;
       }
       case "save-idea": saveIdea(node); break;
+
+      /* --- procedura progetto a blocchi --- */
+      case "add-procedure-block": {
+        var pi = findIdea(id);
+        if (!pi) break;
+        ensureProcedureBlocks(pi).push(createProcedureBlock(node.getAttribute("data-type") || "text", ""));
+        touchProcedure(pi); render();
+        break;
+      }
+      case "add-procedure-from-command": {
+        var pidea = findIdea(id);
+        if (!pidea) break;
+        var parsed = parseProcedureCommand(val(node, "text"));
+        if (!parsed) { toast("Scrivi un testo o un comando", "error"); return; }
+        ensureProcedureBlocks(pidea).push(createProcedureBlock(parsed.type, parsed.text));
+        touchProcedure(pidea); render();
+        break;
+      }
+      case "move-procedure-block": {
+        var pm = findProcedureBlock(id, node.getAttribute("data-block"));
+        if (!pm) break;
+        var dir = node.getAttribute("data-dir");
+        var ni = dir === "up" ? pm.index - 1 : pm.index + 1;
+        if (ni < 0 || ni >= pm.blocks.length) break;
+        var tmp = pm.blocks[pm.index]; pm.blocks[pm.index] = pm.blocks[ni]; pm.blocks[ni] = tmp;
+        touchProcedure(pm.idea); render();
+        break;
+      }
+      case "del-procedure-block": {
+        var pd = findProcedureBlock(id, node.getAttribute("data-block"));
+        if (!pd) break;
+        pd.blocks.splice(pd.index, 1);
+        touchProcedure(pd.idea); render();
+        break;
+      }
+      case "add-procedure-check": {
+        var pc = findProcedureBlock(id, node.getAttribute("data-block"));
+        if (!pc) break;
+        if (!Array.isArray(pc.block.items)) pc.block.items = [];
+        var txt = val(node, "text");
+        if (!txt) return;
+        pc.block.items.push(createProcedureCheckItem(txt));
+        touchProcedure(pc.idea); render();
+        break;
+      }
+      case "toggle-procedure-check": {
+        var pt = findProcedureBlock(id, node.getAttribute("data-block"));
+        if (!pt || !Array.isArray(pt.block.items)) break;
+        var cid = node.getAttribute("data-check");
+        var item = pt.block.items.filter(function (x) { return x.id === cid; })[0];
+        if (item) { item.done = !item.done; touchProcedure(pt.idea); render(); }
+        break;
+      }
+      case "del-procedure-check": {
+        var pdel = findProcedureBlock(id, node.getAttribute("data-block"));
+        if (!pdel || !Array.isArray(pdel.block.items)) break;
+        var dcid = node.getAttribute("data-check");
+        pdel.block.items = pdel.block.items.filter(function (x) { return x.id !== dcid; });
+        touchProcedure(pdel.idea); render();
+        break;
+      }
 
       /* --- opzioni: aspetto --- */
       case "toggle-theme":
@@ -2834,6 +3061,50 @@
     handleAction(form.getAttribute("data-action"), form, e);
   }
 
+  function onInput(e) {
+    var el = e.target;
+    if (!el || !el.getAttribute) return;
+    if (el.getAttribute("data-proc-input") === "text") {
+      var pb = findProcedureBlock(el.getAttribute("data-id"), el.getAttribute("data-block"));
+      if (!pb) return;
+      pb.block.text = el.value || "";
+      touchProcedure(pb.idea);
+      return;
+    }
+    if (el.getAttribute("data-proc-check-input") === "text") {
+      var pc = findProcedureBlock(el.getAttribute("data-id"), el.getAttribute("data-block"));
+      if (!pc || !Array.isArray(pc.block.items)) return;
+      var item = pc.block.items.filter(function (x) { return x.id === el.getAttribute("data-check"); })[0];
+      if (!item) return;
+      item.text = el.value || "";
+      touchProcedure(pc.idea);
+    }
+  }
+
+  function onChange(e) {
+    var el = e.target;
+    if (!el || !el.getAttribute) return;
+    if (el.getAttribute("data-proc-change") !== "type") return;
+    var pb = findProcedureBlock(el.getAttribute("data-id"), el.getAttribute("data-block"));
+    if (!pb) return;
+    var oldType = pb.block.type;
+    var newType = isProcedureType(el.value) ? el.value : "text";
+    if (oldType === newType) return;
+    if (newType === "checklist") {
+      var text = pb.block.text || "";
+      pb.block.type = "checklist";
+      pb.block.items = String(text).split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean).map(function (x) { return createProcedureCheckItem(x); });
+      delete pb.block.text;
+    } else {
+      var txt = oldType === "checklist" ? (pb.block.items || []).map(function (x) { return x.text; }).join("\n") : (pb.block.text || "");
+      pb.block.type = newType;
+      pb.block.text = txt;
+      delete pb.block.items;
+    }
+    touchProcedure(pb.idea);
+    render();
+  }
+
   /* ---- Drag & drop per riordinare (Pointer Events: mouse + touch) ----
      Usato sia per la checklist (.check-list / .check-row) sia per le liste
      di lavori e idee in ordinamento "Manuale" (.reorder-list / .card). ---- */
@@ -2999,6 +3270,8 @@
 
     document.addEventListener("click", onClick, false);
     document.addEventListener("submit", onSubmit, false);
+    document.addEventListener("input", onInput, false);
+    document.addEventListener("change", onChange, false);
     document.addEventListener("pointerdown", onPointerDown, false);
     document.addEventListener("pointermove", onPointerMove, false);
     document.addEventListener("pointerup", onPointerUp, false);
