@@ -8,17 +8,16 @@
    - Quando esce una nuova versione, l'app mostra un avviso e
      aggiorna solo dopo conferma (vedi registerSW in app.js).
 
-   IMPORTANTE per chi pubblica: a OGNI rilascio cambia CACHE_VERSION
-   qui sotto (es. casa-app-2.6.1). Così il browser scarta la vecchia
-   cache e propone l'aggiornamento.
+   IMPORTANTE per chi pubblica: a OGNI rilascio cambia CACHE_VERSION.
    ============================================================ */
-var CACHE_VERSION = "casa-app-2.9.4";
+var CACHE_VERSION = "casa-app-3.0.0-supabase-sync";
 
 // File che compongono l'app (tutti nella root, stesso livello di index.html).
 var APP_SHELL = [
   "./",
   "./index.html",
   "./app.js",
+  "./cloud-sync.js",
   "./manifest.json",
   "./base.css",
   "./themes.css",
@@ -67,7 +66,7 @@ self.addEventListener("message", function (e) {
 });
 
 // FETCH: network-first per i file della nostra origine; tutto il resto
-// (login Google, API Drive, ecc.) passa diretto alla rete senza toccare la cache.
+// (login Google, API Drive, API Supabase, ecc.) passa diretto alla rete senza cache.
 self.addEventListener("fetch", function (e) {
   var req = e.request;
   if (req.method !== "GET") return;
